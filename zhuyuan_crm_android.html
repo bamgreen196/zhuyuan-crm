@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="竹緣CRM" />
+<title>竹緣開運竹 CRM</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --green: #2D6A4F; --green-light: #52B788; --green-pale: #D8F3DC;
+  --ink: #1B2B1E; --ink2: #3D5444; --ink3: #6B8C72;
+  --bg: #F4F7F4; --surface: #FFFFFF; --surface2: #EEF3EE;
+  --border: #D0DDD0; --border2: #B8CCB8;
+  --gold: #C9A84C; --gold-pale: #FDF6E3;
+  --red: #C0392B; --red-pale: #FDECEA;
+  --line-green: #06C755;
+  --radius: 12px; --radius-sm: 8px;
+  --shadow: 0 2px 12px rgba(45,106,79,0.10);
+}
+html, body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Noto Sans TC', sans-serif; color: var(--ink); }
+
+/* ── Layout ── */
+#app { display: flex; flex-direction: column; height: 100vh; }
+.topbar { background: var(--green); color: white; padding: 14px 16px 12px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.topbar-title { font-family: 'Noto Serif TC', serif; font-size: 17px; font-weight: 600; flex: 1; letter-spacing: 0.05em; }
+.topbar-step { font-size: 12px; opacity: 0.75; white-space: nowrap; }
+.content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.bottom-bar { flex-shrink: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 10px 14px 14px; }
+
+/* ── Steps ── */
+.step-indicator { display: flex; gap: 6px; padding: 12px 16px 0; }
+.step-dot { flex: 1; height: 3px; border-radius: 99px; background: var(--border); transition: background .3s; }
+.step-dot.done { background: var(--green-light); }
+.step-dot.active { background: var(--green); }
+
+/* ── Section ── */
+.section { padding: 14px 16px; }
+.section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--ink3); text-transform: uppercase; margin-bottom: 10px; }
+
+/* ── Customer List ── */
+.customer-search { width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 15px; background: var(--surface); color: var(--ink); margin-bottom: 10px; }
+.customer-search:focus { outline: none; border-color: var(--green-light); }
+.customer-list { display: flex; flex-direction: column; gap: 8px; }
+.customer-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: border-color .2s, box-shadow .2s; }
+.customer-card:active { background: var(--surface2); }
+.customer-card.selected { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-pale); }
+.customer-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--green-pale); color: var(--green); font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: 'Noto Serif TC', serif; }
+.customer-info { flex: 1; min-width: 0; }
+.customer-name { font-size: 15px; font-weight: 500; color: var(--ink); }
+.customer-meta { font-size: 12px; color: var(--ink3); margin-top: 2px; }
+.customer-total { font-size: 13px; font-weight: 700; color: var(--green); white-space: nowrap; }
+.add-customer-btn { background: var(--surface); border: 1.5px dashed var(--border2); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; text-align: center; color: var(--ink3); font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.add-customer-btn:active { background: var(--surface2); }
+
+/* ── Category Tabs ── */
+.cat-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 14px 16px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.cat-tabs::-webkit-scrollbar { display: none; }
+.cat-tab { flex-shrink: 0; padding: 8px 16px; border-radius: 99px; border: 1.5px solid var(--border); background: var(--surface); font-size: 14px; font-weight: 500; color: var(--ink2); cursor: pointer; transition: all .2s; white-space: nowrap; }
+.cat-tab.active { background: var(--green); border-color: var(--green); color: white; }
+
+/* ── Product Grid ── */
+.product-grid { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 16px; }
+.product-btn { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; cursor: default; transition: border-color .15s; display: flex; align-items: center; gap: 12px; }
+.product-btn.in-cart { border-color: var(--green-light); background: #F0FAF2; }
+.product-btn-info { flex: 1; min-width: 0; }
+.product-btn-name { font-size: 15px; font-weight: 500; color: var(--ink); }
+.product-btn-price { font-size: 13px; color: var(--gold); font-weight: 700; margin-top: 2px; }
+.product-qty-ctrl { display: flex; align-items: center; border: 1.5px solid var(--border2); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+.pqb { width: 42px; height: 42px; border: none; background: var(--surface2); font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ink2); flex-shrink: 0; }
+.pqb:active { background: var(--green-pale); color: var(--green); }
+.pqn { width: 38px; height: 42px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; background: var(--surface); color: var(--ink); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+.product-subtotal { font-size: 13px; font-weight: 700; color: var(--green); min-width: 52px; text-align: right; flex-shrink: 0; }
+
+/* ── Cart ── */
+.cart-summary { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 0 16px 12px; }
+.cart-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.cart-row:last-of-type { border-bottom: none; }
+.cart-item-name { flex: 1; font-size: 14px; }
+.cart-item-price { font-size: 13px; color: var(--ink3); min-width: 60px; text-align: right; }
+.qty-ctrl { display: flex; align-items: center; gap: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.qty-btn { width: 30px; height: 30px; border: none; background: var(--surface2); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ink2); }
+.qty-btn:active { background: var(--border); }
+.qty-num { width: 28px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; background: var(--surface); }
+.cart-total { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 14px; margin: 0 16px; background: var(--gold-pale); border-radius: var(--radius-sm); border: 1px solid #E8D5A0; }
+.cart-total-label { font-size: 13px; color: var(--ink3); }
+.cart-total-amount { font-size: 22px; font-weight: 700; color: var(--green); font-family: 'Noto Serif TC', serif; }
+.cart-total-qty { font-size: 12px; color: var(--ink3); }
+
+/* ── Buttons ── */
+.btn { width: 100%; padding: 14px; border: none; border-radius: var(--radius); font-size: 16px; font-weight: 700; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; }
+.btn + .btn { margin-top: 8px; }
+.btn-primary { background: var(--green); color: white; }
+.btn-primary:active { background: var(--green-light); }
+.btn-line { background: var(--line-green); color: white; }
+.btn-line:active { opacity: 0.85; }
+.btn-print { background: #2471A3; color: white; }
+.btn-print:active { opacity: 0.85; }
+.btn-ghost { background: var(--surface2); color: var(--ink2); border: 1px solid var(--border); }
+.btn-ghost:active { background: var(--border); }
+.btn-sm { padding: 8px 16px; width: auto; font-size: 13px; }
+.btn-danger { background: var(--red-pale); color: var(--red); border: 1px solid #EBADAA; }
+
+/* ── Receipt ── */
+.receipt-wrap { margin: 0 16px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.receipt-header { background: var(--green); color: white; padding: 16px; text-align: center; font-family: 'Noto Serif TC', serif; }
+.receipt-header h2 { font-size: 18px; letter-spacing: 0.1em; }
+.receipt-header p { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+.receipt-body { padding: 14px; font-size: 13px; line-height: 1.7; }
+.receipt-col-header { display: grid; grid-template-columns: 1fr 52px 44px 56px; gap: 4px; font-size: 11px; color: var(--ink3); padding: 4px 0 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.receipt-item-row { display: grid; grid-template-columns: 1fr 52px 44px 56px; gap: 4px; padding: 5px 0; border-bottom: 1px dashed var(--border); font-size: 13px; align-items: center; }
+.receipt-item-row:last-of-type { border-bottom: none; }
+.receipt-total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; color: var(--green); border-top: 1px solid var(--border2); padding-top: 8px; margin-top: 6px; }
+.receipt-divider { border: none; border-top: 1px dashed var(--border2); margin: 8px 0; }
+.receipt-meta { font-size: 12px; color: var(--ink3); margin-bottom: 10px; }
+
+/* ── History ── */
+.history-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 8px; }
+.history-date { font-size: 12px; color: var(--ink3); margin-bottom: 4px; }
+.history-detail { font-size: 13px; color: var(--ink2); margin-bottom: 6px; line-height: 1.6; }
+.history-amount { font-size: 15px; font-weight: 700; color: var(--green); }
+
+/* ── Settings ── */
+.settings-field { margin-bottom: 14px; }
+.settings-label { font-size: 13px; font-weight: 500; color: var(--ink2); margin-bottom: 6px; display: block; }
+.settings-input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; color: var(--ink); background: var(--surface); }
+.settings-input:focus { outline: none; border-color: var(--green-light); }
+.status-badge { display: inline-block; padding: 4px 12px; border-radius: 99px; font-size: 12px; font-weight: 500; margin-top: 6px; }
+.status-ok { background: var(--green-pale); color: var(--green); }
+.status-err { background: var(--red-pale); color: var(--red); }
+.status-loading { background: var(--surface2); color: var(--ink3); }
+
+/* ── Nav ── */
+.bottom-nav { display: flex; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.nav-item { flex: 1; padding: 10px 4px 8px; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; color: var(--ink3); font-size: 10px; border: none; background: none; min-height: 52px; }
+.nav-item.active { color: var(--green); }
+.nav-icon { font-size: 20px; line-height: 1; }
+
+/* ── Modal ── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: flex-end; justify-content: center; z-index: 100; }
+.modal-overlay.hidden { display: none; }
+.modal { background: var(--surface); border-radius: var(--radius) var(--radius) 0 0; width: 100%; max-width: 480px; padding: 20px 16px 32px; }
+.modal-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+.modal-input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 16px; margin-bottom: 12px; }
+.modal-input:focus { outline: none; border-color: var(--green-light); }
+
+/* ── Empty ── */
+.empty { text-align: center; padding: 40px 20px; color: var(--ink3); font-size: 14px; }
+
+/* ── Print styles ── */
+@media print {
+  #app { display: none !important; }
+  #print-area { display: block !important; font-family: monospace; font-size: 12px; width: 58mm; margin: 0 auto; line-height: 1.9; color: #000; }
+  #print-area .pc { text-align: center; font-weight: bold; }
+  #print-area .pr { display: flex; justify-content: space-between; font-size: 12px; }
+  #print-area .pr4 { display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr; font-size: 11px; gap: 2px; }
+  #print-area .ph { display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr; font-size: 10px; gap: 2px; color: #555; }
+  #print-area .pd { border-top: 1px dashed #000; margin: 4px 0; }
+  #print-area .pt { display: flex; justify-content: space-between; font-size: 13px; font-weight: bold; border-top: 1px dashed #000; padding-top: 4px; margin-top: 4px; }
+}
+@media screen { #print-area { display: none; } }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Top Bar -->
+  <div class="topbar">
+    <button id="topbar-back" onclick="goBack()" style="display:none;background:none;border:none;color:white;font-size:26px;cursor:pointer;padding:0 8px 0 0;line-height:1;flex-shrink:0;">‹</button>
+    <div class="topbar-title">竹緣開運竹</div>
+    <div class="topbar-step" id="topbar-step">選客戶</div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="content" id="content">
+    <!-- Screen: ORDER -->
+    <div id="screen-order" class="screen">
+      <div class="step-indicator" id="step-indicator">
+        <div class="step-dot active" id="sdot-0"></div>
+        <div class="step-dot" id="sdot-1"></div>
+        <div class="step-dot" id="sdot-2"></div>
+        <div class="step-dot" id="sdot-3"></div>
+      </div>
+
+      <!-- Step 0: Select Customer -->
+      <div id="step0" class="step-pane">
+        <div class="section">
+          <div class="section-label">選擇客戶</div>
+          <input class="customer-search" id="customer-search" type="text" placeholder="搜尋客戶名稱..." oninput="filterCustomers()" />
+          <div class="customer-list" id="customer-list"></div>
+          <div style="height:10px;"></div>
+          <button class="add-customer-btn" onclick="openAddCustomer()">
+            <span style="font-size:18px;">+</span> 新增客戶
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 1: Choose Products -->
+      <div id="step1" class="step-pane" style="display:none;">
+        <div class="cat-tabs" id="cat-tabs"></div>
+        <div class="product-grid" id="product-grid"></div>
+      </div>
+
+      <!-- Step 2: Review Cart -->
+      <div id="step2" class="step-pane" style="display:none;">
+        <div class="section" style="padding-bottom:4px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div class="section-label" style="margin-bottom:0;">訂單確認</div>
+            <button onclick="goToStep(1)" style="background:none;border:none;font-size:13px;color:var(--ink3);cursor:pointer;padding:4px 0;">← 返回選商品</button>
+          </div>
+        </div>
+        <div class="cart-summary" id="cart-review"></div>
+        <div class="cart-total" id="cart-total-display"></div>
+        <div style="height:14px;"></div>
+      </div>
+
+      <!-- Step 3: Receipt -->
+      <div id="step3" class="step-pane" style="display:none;">
+        <div class="receipt-wrap" id="receipt-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Screen: HISTORY -->
+    <div id="screen-history" class="screen" style="display:none;">
+
+      <!-- 今天訂單 -->
+      <div id="history-view-today">
+        <div style="display:flex;align-items:center;gap:8px;padding:12px 16px 8px;">
+          <div style="flex:1;font-size:15px;font-weight:500;color:var(--ink);" id="today-title">今天的訂單</div>
+          <button onclick="openHistorySearch()" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 14px;font-size:13px;color:var(--ink2);cursor:pointer;">查詢</button>
+        </div>
+        <div style="padding:0 16px 16px;" id="history-today-list"></div>
+      </div>
+
+      <!-- 查詢面板（預設隱藏） -->
+      <div id="history-view-search" style="display:none;">
+        <div style="display:flex;align-items:center;gap:8px;padding:12px 16px 12px;">
+          <button onclick="closeHistorySearch()" style="background:none;border:none;font-size:22px;color:var(--ink2);cursor:pointer;line-height:1;padding:0 6px 0 0;">‹</button>
+          <div style="font-size:15px;font-weight:500;color:var(--ink);">查詢訂單</div>
+        </div>
+        <div style="padding:0 16px 12px;display:flex;flex-direction:column;gap:10px;">
+          <div>
+            <div style="font-size:12px;color:var(--ink3);margin-bottom:5px;">客戶</div>
+            <select id="search-customer" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:var(--surface);color:var(--ink);">
+              <option value="">全部客戶</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--ink3);margin-bottom:5px;">日期</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="date" id="search-date-from" style="flex:1;padding:10px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--ink);" />
+              <span style="color:var(--ink3);font-size:13px;">到</span>
+              <input type="date" id="search-date-to" style="flex:1;padding:10px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--ink);" />
+            </div>
+          </div>
+          <button onclick="runHistorySearch()" class="btn btn-primary" style="padding:12px;">搜尋</button>
+        </div>
+        <div style="padding:0 16px 16px;">
+          <div id="search-result-label" style="font-size:12px;color:var(--ink3);margin-bottom:8px;"></div>
+          <div id="history-search-list"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Screen: SETTINGS -->
+    <div id="screen-settings" class="screen" style="display:none;">
+      <div class="section">
+        <div class="section-label">Google Sheets 串接</div>
+        <div class="settings-field">
+          <label class="settings-label">Apps Script 網址</label>
+          <input class="settings-input" id="api-url-input" type="text" placeholder="https://script.google.com/macros/s/.../exec" />
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm" onclick="saveAndTestApi()">儲存並測試</button>
+            <button class="btn btn-ghost btn-sm" onclick="syncAll()" id="sync-btn" style="display:none;">重新同步</button>
+            <span id="api-status-badge" style="display:none;"></span>
+          </div>
+        </div>
+        <div id="sync-summary" style="display:none;background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:var(--ink2);line-height:1.9;margin-top:4px;"></div>
+        <div class="settings-field" style="margin-top:20px;">
+          <div class="section-label">試算表結構說明</div>
+          <p style="font-size:12px;color:var(--ink3);line-height:1.9;">
+            需建立以下三個分頁：<br>
+            <b style="color:var(--ink2);">商品清單</b> — A:分類、B:商品名稱、C:單價<br>
+            <b style="color:var(--ink2);">客戶資料</b> — A:客戶ID、B:姓名、C:累積金額、D:訂單數、E:最後消費<br>
+            <b style="color:var(--ink2);">訂單紀錄</b> — A:訂單ID、B:日期、C:客戶ID、D:客戶姓名、E:明細、F:總盆數、G:總金額
+          </p>
+        </div>
+        <div class="settings-field">
+          <div class="section-label">關於</div>
+          <p style="font-size:13px;color:var(--ink3);line-height:1.8;">
+            竹緣開運竹 CRM 點單系統<br>
+            支援：點單 / 收據 / LINE 分享 / 列印
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="bottom-bar" id="bottom-bar">
+    <button class="btn btn-primary" id="main-btn" onclick="mainAction()">選擇客戶後繼續</button>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <button class="nav-item active" id="nav-order" onclick="switchScreen('order')">
+      <span class="nav-icon">🧾</span>開單
+    </button>
+    <button class="nav-item" id="nav-history" onclick="switchScreen('history')">
+      <span class="nav-icon">📋</span>記錄
+    </button>
+    <button class="nav-item" id="nav-settings" onclick="switchScreen('settings')">
+      <span class="nav-icon">⚙️</span>設定
+    </button>
+  </div>
+</div>
+
+<!-- Modal: Add Customer -->
+<div class="modal-overlay hidden" id="modal-add-customer">
+  <div class="modal">
+    <div class="modal-title">新增客戶</div>
+    <input class="modal-input" id="new-customer-input" type="text" placeholder="客戶姓名" />
+    <button class="btn btn-primary" onclick="submitAddCustomer()">新增</button>
+    <button class="btn btn-ghost" style="margin-top:8px;" onclick="closeModal('modal-add-customer')">取消</button>
+  </div>
+</div>
+
+<!-- Modal: Custom Price -->
+<div class="modal-overlay hidden" id="modal-custom-price">
+  <div class="modal">
+    <div class="modal-title">輸入客製金額</div>
+    <div style="font-size:14px;color:var(--ink2);margin-bottom:12px;">品項：<span id="custom-price-name" style="font-weight:500;"></span></div>
+    <input class="modal-input" id="custom-price-input" type="number" placeholder="輸入金額，例如 1200" inputmode="numeric" />
+    <button class="btn btn-primary" onclick="submitCustomPrice()">加入購物車</button>
+    <button class="btn btn-ghost" style="margin-top:8px;" onclick="closeModal('modal-custom-price')">取消</button>
+  </div>
+</div>
+
+<!-- Modal: Receipt Popup -->
+<div class="modal-overlay hidden" id="modal-receipt-popup">
+  <div class="modal">
+    <div class="modal-title">收據內容</div>
+    <pre id="receipt-popup-text" style="font-family:monospace;font-size:12px;line-height:1.8;background:var(--surface2);padding:12px;border-radius:8px;margin-bottom:12px;white-space:pre-wrap;max-height:300px;overflow-y:auto;"></pre>
+    <button class="btn btn-primary" onclick="copyReceiptAndClose()">複製收據</button>
+    <button class="btn btn-ghost" style="margin-top:8px;" onclick="closeModal('modal-receipt-popup')">關閉</button>
+  </div>
+</div>
+
+<!-- Print Area -->
+<div id="print-area"></div>
+
+<script>
+// ── State ──
+// 修正舊版 Android 瀏覽器高度計算問題
+function fixHeight() {
+  const vh = window.innerHeight;
+  document.getElementById('app').style.height = vh + 'px';
+}
+fixHeight();
+window.addEventListener('resize', fixHeight);
+let API_URL = 'https://script.google.com/macros/s/AKfycbyXocMO2_MM3GZh7hZBVxN51zk_B3QWkNFpqNodbSBPV0VGfbFxU8ir70saej8kZwwx/exec';
+let products = JSON.parse(localStorage.getItem('zhuProducts') || '[]');
+let customers = JSON.parse(localStorage.getItem('zhuCustomers') || '[]');
+let cart = {}; // { productKey: { name, price, qty } }
+let currentCustomer = null;
+let currentStep = 0;
+let currentCategory = '';
+let currentScreen = 'order';
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', () => {
+  if (API_URL) {
+    document.getElementById('api-url-input').value = API_URL;
+    document.getElementById('sync-btn').style.display = 'inline-block';
+    const badge = document.getElementById('api-status-badge');
+    badge.style.display = 'inline-block';
+    badge.className = 'status-badge status-ok';
+    badge.textContent = '✓ 已設定';
+    fetchProducts();
+    fetchCustomers().then(c => {
+      if (c) showSyncSummary(products.length, c.length);
+    });
+  } else {
+    loadDefaultProducts();
+  }
+  renderCustomers();
+});
+
+function loadDefaultProducts() {
+  products = [
+    { category: '600', name: '308', price: 600 },
+    { category: '600', name: '31230', price: 600 },
+    { category: '1000', name: '蝸牛', price: 1000 },
+    { category: '1000', name: '中31230', price: 1000 },
+    { category: '1500', name: '牡丹', price: 1500 },
+    { category: '客製', name: '客製造型', price: 1200 },
+    { category: '單支', name: '單支開運竹', price: 350 },
+    { category: '素材', name: '素材包', price: 200 },
+  ];
+  localStorage.setItem('zhuProducts', JSON.stringify(products));
+}
+
+// ── API ──
+async function fetchProducts() {
+  try {
+    const r = await fetch(API_URL + '?action=getProducts');
+    const data = await r.json();
+    if (Array.isArray(data) && data.length) {
+      products = data;
+      localStorage.setItem('zhuProducts', JSON.stringify(products));
+    }
+  } catch(e) {}
+}
+
+async function fetchCustomerOrders(customerId) {
+  if (!API_URL) return [];
+  try {
+    const r = await fetch(`${API_URL}?action=getCustomerOrders&customerId=${customerId}`);
+    return await r.json();
+  } catch(e) { return []; }
+}
+
+async function apiPost(payload) {
+  if (!API_URL) return null;
+  try {
+    const r = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+// ── Screen ──
+function switchScreen(s) {
+  currentScreen = s;
+  document.querySelectorAll('.screen').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('screen-' + s).style.display = 'block';
+  document.getElementById('nav-' + s).classList.add('active');
+
+  const bb = document.getElementById('bottom-bar');
+  if (s === 'order') {
+    bb.style.display = 'block';
+    updateBottomBar();
+  } else {
+    bb.style.display = 'none';
+  }
+
+  if (s === 'history') renderHistory();
+}
+
+// ── Customers ──
+function renderCustomers(filter = '') {
+  const el = document.getElementById('customer-list');
+  const list = filter
+    ? customers.filter(c => c.name.includes(filter))
+    : customers;
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">尚無客戶資料<br>請先新增客戶</div>';
+    return;
+  }
+  el.innerHTML = list.map(c => `
+    <div class="customer-card ${currentCustomer?.id === c.id ? 'selected' : ''}" onclick="selectCustomer('${c.id}')">
+      <div class="customer-avatar">${c.name.slice(0,1)}</div>
+      <div class="customer-info">
+        <div class="customer-name">${c.name}</div>
+        <div class="customer-meta">消費 ${c.orderCount || 0} 次｜最後：${c.lastDate || '—'}</div>
+      </div>
+      <div class="customer-total">$${(c.totalSpent || 0).toLocaleString()}</div>
+    </div>
+  `).join('');
+}
+
+function filterCustomers() {
+  renderCustomers(document.getElementById('customer-search').value);
+}
+
+function selectCustomer(id) {
+  currentCustomer = customers.find(c => c.id === id);
+  renderCustomers(document.getElementById('customer-search').value);
+  updateBottomBar();
+}
+
+function openAddCustomer() {
+  document.getElementById('new-customer-input').value = '';
+  document.getElementById('modal-add-customer').classList.remove('hidden');
+}
+
+async function submitAddCustomer() {
+  const name = document.getElementById('new-customer-input').value.trim();
+  if (!name) return;
+  closeModal('modal-add-customer');
+
+  let newC;
+  if (API_URL) {
+    const res = await apiPost({ action: 'addCustomer', name });
+    if (res && res.id) {
+      newC = { id: res.id, name, totalSpent: 0, orderCount: 0, lastDate: '' };
+    }
+  } else {
+    newC = { id: 'L' + Date.now(), name, totalSpent: 0, orderCount: 0, lastDate: '' };
+  }
+  if (newC) {
+    customers.unshift(newC);
+    localStorage.setItem('zhuCustomers', JSON.stringify(customers));
+    selectCustomer(newC.id);
+    renderCustomers();
+  }
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+}
+
+// ── Steps ──
+function goToStep(n) {
+  document.querySelectorAll('.step-pane').forEach(el => el.style.display = 'none');
+  document.getElementById('step' + n).style.display = 'block';
+  currentStep = n;
+  updateStepIndicator();
+  updateBottomBar();
+  updateTopbar();
+  document.getElementById('content').scrollTop = 0;
+}
+
+function updateStepIndicator() {
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById('sdot-' + i);
+    dot.className = 'step-dot ' + (i < currentStep ? 'done' : i === currentStep ? 'active' : '');
+  }
+}
+
+function updateTopbar() {
+  const labels = ['選客戶', '選商品', '確認訂單', '收據'];
+  document.getElementById('topbar-step').textContent = labels[currentStep];
+  const backBtn = document.getElementById('topbar-back');
+  backBtn.style.display = currentStep > 0 ? 'block' : 'none';
+}
+
+function goBack() {
+  if (currentStep === 1) {
+    // 返回選客戶時清空購物車
+    cart = {};
+    currentCustomer = null;
+    goToStep(0);
+    renderCustomers();
+  } else if (currentStep === 2) {
+    goToStep(1);
+  } else if (currentStep === 3) {
+    goToStep(2);
+    renderCartReview();
+    document.getElementById('main-btn').style.display = 'block';
+    updateBottomBar();
+  }
+}
+
+function updateBottomBar() {
+  const btn = document.getElementById('main-btn');
+  if (currentStep === 0) {
+    btn.textContent = currentCustomer ? `繼續（${currentCustomer.name}）→` : '選擇客戶後繼續';
+    btn.disabled = !currentCustomer;
+    btn.style.opacity = currentCustomer ? '1' : '0.5';
+  } else if (currentStep === 1) {
+    const total = cartTotal();
+    const qty = cartQty();
+    btn.textContent = qty > 0 ? `確認訂單 ${qty}盆 · $${total.toLocaleString()} →` : '選擇商品後繼續';
+    btn.disabled = qty === 0;
+    btn.style.opacity = qty > 0 ? '1' : '0.5';
+  } else if (currentStep === 2) {
+    btn.textContent = '完成訂單 →';
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function mainAction() {
+  if (currentStep === 0 && currentCustomer) {
+    renderCategories();
+    goToStep(1);
+  } else if (currentStep === 1 && cartQty() > 0) {
+    renderCartReview();
+    goToStep(2);
+  } else if (currentStep === 2) {
+    completeOrder();
+  }
+}
+
+// ── Products ──
+function renderCategories() {
+  const cats = [...new Set(products.map(p => p.category))];
+  if (!currentCategory || !cats.includes(currentCategory)) currentCategory = cats[0];
+  const tabs = document.getElementById('cat-tabs');
+  tabs.innerHTML = cats.map(c => `
+    <button class="cat-tab ${c === currentCategory ? 'active' : ''}" onclick="selectCategory('${c}')">${c}</button>
+  `).join('');
+  renderProductGrid();
+}
+
+function selectCategory(cat) {
+  currentCategory = cat;
+  document.querySelectorAll('.cat-tab').forEach(el => {
+    el.classList.toggle('active', el.textContent === cat);
+  });
+  renderProductGrid();
+}
+
+function renderProductGrid() {
+  const items = products.filter(p => p.category === currentCategory);
+  const grid = document.getElementById('product-grid');
+  grid.innerHTML = items.map(p => {
+    const key = p.category + '|' + p.name;
+    const qty = cart[key] ? cart[key].qty : 0;
+    return `
+      <div class="product-btn ${qty > 0 ? 'in-cart' : ''}">
+        <div class="product-btn-info">
+          <div class="product-btn-name">${p.name}</div>
+          <div class="product-btn-price">$${p.price}</div>
+        </div>
+        ${qty > 0 ? `<div class="product-subtotal">$${(p.price * qty).toLocaleString()}</div>` : ''}
+        <div class="product-qty-ctrl">
+          <button class="pqb" onclick="adjustProductQty('${p.category}','${p.name}',${p.price},-1)">−</button>
+          <div class="pqn">${qty}</div>
+          <button class="pqb" onclick="adjustProductQty('${p.category}','${p.name}',${p.price},1)">+</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function adjustProductQty(cat, name, price, delta) {
+  const key = cat + '|' + name;
+  // 客製分類按+時先詢問金額
+  if (cat === '客製' && delta > 0) {
+    openCustomPrice(cat, name);
+    return;
+  }
+  if (!cart[key] && delta > 0) {
+    cart[key] = { name, price, qty: 0, category: cat };
+  }
+  if (!cart[key]) return;
+  cart[key].qty += delta;
+  if (cart[key].qty <= 0) delete cart[key];
+  renderProductGrid();
+  updateBottomBar();
+}
+
+function openCustomPrice(cat, name) {
+  document.getElementById('custom-price-name').textContent = name;
+  document.getElementById('custom-price-input').value = '';
+  document.getElementById('modal-custom-price').dataset.cat = cat;
+  document.getElementById('modal-custom-price').dataset.name = name;
+  document.getElementById('modal-custom-price').classList.remove('hidden');
+  setTimeout(() => document.getElementById('custom-price-input').focus(), 100);
+}
+
+function submitCustomPrice() {
+  const price = parseInt(document.getElementById('custom-price-input').value);
+  if (!price || price <= 0) { alert('請輸入有效金額'); return; }
+  const cat  = document.getElementById('modal-custom-price').dataset.cat;
+  const name = document.getElementById('modal-custom-price').dataset.name;
+  const key  = cat + '|' + name;
+  closeModal('modal-custom-price');
+  if (!cart[key]) {
+    cart[key] = { name, price, qty: 0, category: cat };
+  }
+  // 每次按+都用新輸入的金額新增一筆（允許同品名不同價格）
+  const uniqueKey = cat + '|' + name + '|' + price;
+  if (!cart[uniqueKey]) {
+    cart[uniqueKey] = { name: name + '（$' + price + '）', price, qty: 0, category: cat };
+  }
+  cart[uniqueKey].qty += 1;
+  delete cart[key]; // 移除無價格的佔位
+  renderProductGrid();
+  updateBottomBar();
+}
+
+function cartTotal() {
+  return Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0);
+}
+function cartQty() {
+  return Object.values(cart).reduce((s, i) => s + i.qty, 0);
+}
+function cartItems() {
+  return Object.values(cart);
+}
+
+// ── Cart Review ──
+function renderCartReview() {
+  const items = cartItems();
+  const review = document.getElementById('cart-review');
+  review.innerHTML = items.map((item, idx) => `
+    <div class="cart-row">
+      <div class="cart-item-name">${item.name}</div>
+      <div class="qty-ctrl">
+        <button class="qty-btn" onclick="adjustQty('${item.category}|${item.name}',-1)">−</button>
+        <div class="qty-num">${item.qty}</div>
+        <button class="qty-btn" onclick="adjustQty('${item.category}|${item.name}',1)">+</button>
+      </div>
+      <div class="cart-item-price">$${(item.price * item.qty).toLocaleString()}</div>
+    </div>
+  `).join('');
+
+  const total = cartTotal();
+  const qty = cartQty();
+  document.getElementById('cart-total-display').innerHTML = `
+    <div>
+      <div class="cart-total-label">共 ${qty} 盆</div>
+    </div>
+    <div>
+      <div class="cart-total-amount">$${total.toLocaleString()}</div>
+    </div>`;
+}
+
+function adjustQty(key, delta) {
+  if (!cart[key]) return;
+  cart[key].qty += delta;
+  if (cart[key].qty <= 0) delete cart[key];
+  renderCartReview();
+  updateBottomBar();
+  if (cartQty() === 0) goToStep(1);
+}
+
+// ── Complete Order ──
+async function completeOrder() {
+  const items = cartItems();
+  const totalAmount = cartTotal();
+  const totalQty = cartQty();
+
+  // Save to API
+  apiPost({
+    action: 'saveOrder',
+    customerId: currentCustomer.id,
+    customerName: currentCustomer.name,
+    items,
+    totalQty,
+    totalAmount
+  });
+
+  // Update local customer data
+  const c = customers.find(cc => cc.id === currentCustomer.id);
+  if (c) {
+    c.totalSpent = (c.totalSpent || 0) + totalAmount;
+    c.orderCount = (c.orderCount || 0) + 1;
+    c.lastDate = new Date().toLocaleDateString('zh-TW').replace(/\//g, '/');
+    localStorage.setItem('zhuCustomers', JSON.stringify(customers));
+  }
+
+  buildReceipt(totalQty, totalAmount);
+  buildPrintArea(totalQty, totalAmount);
+  goToStep(3);
+  document.getElementById('main-btn').style.display = 'none';
+}
+
+function buildReceipt(totalQty, totalAmount) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const dateStr = `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const items = cartItems();
+
+  const rows = items.map(i => `
+    <div class="receipt-item-row">
+      <span>${i.name}</span>
+      <span style="color:var(--ink3);">${i.price}</span>
+      <span style="color:var(--ink3);">x${i.qty}</span>
+      <span style="text-align:right;font-weight:500;">$${(i.price * i.qty).toLocaleString()}</span>
+    </div>`).join('');
+
+  document.getElementById('receipt-wrap').innerHTML = `
+    <div class="receipt-header">
+      <h2>竹緣開運竹</h2>
+      <p>${dateStr}</p>
+    </div>
+    <div class="receipt-body">
+      <div class="receipt-meta">客戶：${currentCustomer.name}</div>
+      <div class="receipt-col-header">
+        <span>商品</span><span>單價</span><span>數量</span><span style="text-align:right;">小計</span>
+      </div>
+      ${rows}
+      <div class="receipt-total-row">
+        <span>共 ${totalQty} 盆</span>
+        <span>$${totalAmount.toLocaleString()}</span>
+      </div>
+    </div>
+    <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:8px;">
+      <button class="btn btn-print" onclick="doPrint()">列印收據</button>
+      <button class="btn btn-line" onclick="shareToLine()">分享到 LINE</button>
+      <button class="btn btn-ghost" onclick="newOrder()">開新的單</button>
+      <button class="btn btn-ghost" style="font-size:12px;color:var(--ink3);margin-top:4px;" onclick="diagnosePrinter()">印表機診斷</button>
+    </div>`;
+}
+
+function buildPrintArea(totalQty, totalAmount) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const dateStr = `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const items = cartItems();
+  let html = `<div class="pc">竹緣開運竹</div><div class="pc">結帳單</div><div class="pd"></div>`;
+  html += `<div>${dateStr}</div><div>客戶：${currentCustomer.name}</div><div class="pd"></div>`;
+  html += `<div class="ph"><span>商品</span><span>單價</span><span>數量</span><span>小計</span></div><div class="pd"></div>`;
+  items.forEach(i => {
+    html += `<div class="pr4"><span>${i.name}</span><span>${i.price}</span><span>x${i.qty}</span><span>${(i.price * i.qty).toLocaleString()}</span></div>`;
+  });
+  html += `<div class="pt"><span>共${totalQty}盆</span><span>$${totalAmount.toLocaleString()}</span></div>`;
+  document.getElementById('print-area').innerHTML = html;
+}
+
+function receiptText() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const dateStr = `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const items = cartItems();
+  let lines = ['竹緣開運竹 結帳單', dateStr, `客戶：${currentCustomer.name}`, '---'];
+  items.forEach(i => lines.push(`${i.name} x${i.qty}  $${(i.price*i.qty).toLocaleString()}`));
+  lines.push('---');
+  lines.push(`共${cartQty()}盆  總計 $${cartTotal().toLocaleString()}`);
+  return lines.join('\n');
+}
+
+function doPrint() {
+  const items = cartItems();
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const dateStr = `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const totalQty = cartQty();
+  const totalAmt = cartTotal();
+
+  // ── 方法1：SUNMI WebView JS Bridge ──
+  try {
+    if (window.printer) {
+      window.printer.printerInit();
+      window.printer.setAlignment(1);
+      window.printer.printText('竹緣開運竹\n');
+      window.printer.printText('      結帳單\n');
+      window.printer.printText('------------------------\n');
+      window.printer.setAlignment(0);
+      window.printer.printText(`${dateStr}\n`);
+      window.printer.printText(`客戶：${currentCustomer.name}\n`);
+      window.printer.printText('------------------------\n');
+      items.forEach(i => {
+        window.printer.printText(`${i.name}\n`);
+        window.printer.printText(`  $${i.price} x${i.qty} = $${(i.price*i.qty).toLocaleString()}\n`);
+      });
+      window.printer.printText('------------------------\n');
+      window.printer.setAlignment(1);
+      window.printer.printText(`共${totalQty}盆\n`);
+      window.printer.printText(`總計 $${totalAmt.toLocaleString()}\n`);
+      window.printer.printText('\n\n\n');
+      window.printer.cutPaper(1);
+      return;
+    }
+  } catch(e) {}
+
+  // ── 方法2：SUNMI Inner Printer ──
+  try {
+    if (window.SunmiInnerPrinter) {
+      const p = window.SunmiInnerPrinter;
+      p.printerInit();
+      p.printText('      竹緣開運竹\n        結帳單\n');
+      p.printText('------------------------\n');
+      p.printText(`${dateStr}\n客戶：${currentCustomer.name}\n`);
+      p.printText('------------------------\n');
+      items.forEach(i => {
+        p.printText(`${i.name}\n  $${i.price} x${i.qty} = $${(i.price*i.qty).toLocaleString()}\n`);
+      });
+      p.printText('------------------------\n');
+      p.printText(`共${totalQty}盆  總計 $${totalAmt.toLocaleString()}\n\n\n`);
+      return;
+    }
+  } catch(e) {}
+
+  // ── Fallback：顯示收據文字彈窗 ──
+  showReceiptPopup();
+}
+
+function showReceiptPopup() {
+  const text = receiptText();
+  document.getElementById('receipt-popup-text').textContent = text;
+  document.getElementById('modal-receipt-popup').classList.remove('hidden');
+}
+
+function copyReceiptAndClose() {
+  const text = document.getElementById('receipt-popup-text').textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('已複製！可貼到 LINE 傳給客戶');
+    });
+  } else {
+    const el = document.getElementById('receipt-popup-text');
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    document.execCommand('copy');
+    alert('已複製！可貼到 LINE 傳給客戶');
+  }
+  closeModal('modal-receipt-popup');
+}
+
+function diagnosePrinter() {
+  const keys = ['printer','SunmiInnerPrinter','sunmi','Android','SunmiPrinter'];
+  const found = keys.filter(k => window[k] !== undefined);
+  const msg = found.length
+    ? '偵測到：' + found.join(', ')
+    : '未偵測到任何印表機物件\n（表示此瀏覽器無法直接控制印表機）';
+  alert('印表機診斷：\n' + msg);
+}
+
+function shareToLine() {
+  const text = receiptText();
+  window.open('https://line.me/R/share?text=' + encodeURIComponent(text), '_blank');
+}
+
+function newOrder() {
+  cart = {};
+  currentCustomer = null;
+  document.getElementById('main-btn').style.display = 'block';
+  document.getElementById('customer-search').value = '';
+  goToStep(0);
+  renderCustomers();
+}
+
+// ── History ──
+function todayStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+}
+
+async function renderHistory() {
+  // 預設顯示今天，並從 API 撈全部訂單篩選
+  const listEl = document.getElementById('history-today-list');
+  const title  = document.getElementById('today-title');
+  const today  = todayStr();
+  title.textContent = `今天的訂單（${today.replace(/-/g,'/')}）`;
+  listEl.innerHTML = '<div class="empty">載入中...</div>';
+
+  // 從 API 拉所有訂單（用空字串 customerId 取全部）
+  let orders = [];
+  if (API_URL) {
+    try {
+      const r = await fetch(`${API_URL}?action=getAllOrders`);
+      const data = await r.json();
+      if (Array.isArray(data)) orders = data;
+    } catch(e) {}
+  }
+
+  // 篩選今天
+  const todayOrders = orders.filter(o => o.date && o.date.startsWith(today));
+
+  if (!todayOrders.length) {
+    listEl.innerHTML = '<div class="empty">今天尚無訂單</div>';
+    return;
+  }
+  listEl.innerHTML = todayOrders.map(o => `
+    <div class="history-card">
+      <div class="history-date">${o.date} ・ ${o.customerName || ''}</div>
+      <div class="history-detail">${o.detail}</div>
+      <div class="history-amount">共${o.totalQty}盆 · $${(o.totalAmount||0).toLocaleString()}</div>
+    </div>`).join('');
+}
+
+function openHistorySearch() {
+  document.getElementById('history-view-today').style.display = 'none';
+  document.getElementById('history-view-search').style.display = 'block';
+  // 填入客戶選單
+  const sel = document.getElementById('search-customer');
+  sel.innerHTML = '<option value="">全部客戶</option>' +
+    customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  // 預設日期填今天
+  const today = todayStr();
+  document.getElementById('search-date-from').value = today;
+  document.getElementById('search-date-to').value = today;
+  document.getElementById('history-search-list').innerHTML = '';
+  document.getElementById('search-result-label').textContent = '';
+}
+
+function closeHistorySearch() {
+  document.getElementById('history-view-search').style.display = 'none';
+  document.getElementById('history-view-today').style.display = 'block';
+}
+
+async function runHistorySearch() {
+  const customerId = document.getElementById('search-customer').value;
+  const dateFrom   = document.getElementById('search-date-from').value;
+  const dateTo     = document.getElementById('search-date-to').value;
+  const listEl     = document.getElementById('history-search-list');
+  const labelEl    = document.getElementById('search-result-label');
+
+  listEl.innerHTML = '<div class="empty">查詢中...</div>';
+  labelEl.textContent = '';
+
+  let orders = [];
+  if (API_URL) {
+    try {
+      if (customerId) {
+        const r = await fetch(`${API_URL}?action=getCustomerOrders&customerId=${customerId}`);
+        orders = await r.json();
+      } else {
+        const r = await fetch(`${API_URL}?action=getAllOrders`);
+        orders = await r.json();
+      }
+    } catch(e) { orders = []; }
+  }
+
+  // 日期篩選
+  if (dateFrom) orders = orders.filter(o => o.date && o.date >= dateFrom);
+  if (dateTo)   orders = orders.filter(o => o.date && o.date <= dateTo + ' 99');
+
+  if (!orders.length) {
+    listEl.innerHTML = '<div class="empty">查無符合的訂單</div>';
+    labelEl.textContent = '';
+    return;
+  }
+
+  const totalAmt = orders.reduce((s, o) => s + (o.totalAmount||0), 0);
+  const totalQty = orders.reduce((s, o) => s + (o.totalQty||0), 0);
+  labelEl.textContent = `共 ${orders.length} 筆・${totalQty} 盆・$${totalAmt.toLocaleString()}`;
+
+  listEl.innerHTML = orders.map(o => `
+    <div class="history-card">
+      <div class="history-date">${o.date} ・ ${o.customerName || ''}</div>
+      <div class="history-detail">${o.detail}</div>
+      <div class="history-amount">共${o.totalQty}盆 · $${(o.totalAmount||0).toLocaleString()}</div>
+    </div>`).join('');
+}
+
+// ── Settings ──
+async function saveAndTestApi() {
+  const url = document.getElementById('api-url-input').value.trim();
+  if (!url) { alert('請輸入 Apps Script 網址'); return; }
+  const badge = document.getElementById('api-status-badge');
+  badge.style.display = 'inline-block';
+  badge.className = 'status-badge status-loading';
+  badge.textContent = '測試中...';
+  document.getElementById('sync-summary').style.display = 'none';
+  try {
+    const r = await fetch(url + '?action=getProducts');
+    const data = await r.json();
+    if (Array.isArray(data) && data.length) {
+      API_URL = url;
+      localStorage.setItem('zhuApiUrl', url);
+      products = data;
+      localStorage.setItem('zhuProducts', JSON.stringify(products));
+      badge.className = 'status-badge status-ok';
+      badge.textContent = '✓ 連線成功';
+      document.getElementById('sync-btn').style.display = 'inline-block';
+      const custData = await fetchCustomers();
+      showSyncSummary(data.length, custData ? custData.length : customers.length);
+    } else {
+      throw new Error('商品清單為空或格式不符');
+    }
+  } catch(e) {
+    badge.className = 'status-badge status-err';
+    badge.textContent = '✗ 連線失敗：' + e.message;
+  }
+}
+
+async function syncAll() {
+  if (!API_URL) return;
+  const badge = document.getElementById('api-status-badge');
+  badge.style.display = 'inline-block';
+  badge.className = 'status-badge status-loading';
+  badge.textContent = '同步中...';
+  try {
+    const [pr, cr] = await Promise.all([
+      fetch(API_URL + '?action=getProducts').then(r => r.json()),
+      fetch(API_URL + '?action=getCustomers').then(r => r.json()),
+    ]);
+    if (Array.isArray(pr)) { products = pr; localStorage.setItem('zhuProducts', JSON.stringify(products)); }
+    if (Array.isArray(cr)) { customers = cr; localStorage.setItem('zhuCustomers', JSON.stringify(customers)); }
+    badge.className = 'status-badge status-ok';
+    badge.textContent = '✓ 已同步';
+    showSyncSummary(products.length, customers.length);
+  } catch(e) {
+    badge.className = 'status-badge status-err';
+    badge.textContent = '✗ 同步失敗';
+  }
+}
+
+function showSyncSummary(prodCount, custCount) {
+  const el = document.getElementById('sync-summary');
+  const cats = [...new Set(products.map(p => p.category))];
+  el.style.display = 'block';
+  el.innerHTML = `
+    商品：${prodCount} 項（${cats.join('、')}）<br>
+    客戶：${custCount} 位<br>
+    上次同步：${new Date().toLocaleString('zh-TW')}`;
+}
+
+async function fetchCustomers() {
+  try {
+    const r = await fetch(API_URL + '?action=getCustomers');
+    const data = await r.json();
+    if (Array.isArray(data)) {
+      customers = data;
+      localStorage.setItem('zhuCustomers', JSON.stringify(customers));
+      renderCustomers();
+      return data;
+    }
+  } catch(e) {}
+  return null;
+}
+</script>
+</body>
+</html>
