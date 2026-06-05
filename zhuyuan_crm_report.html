@@ -359,6 +359,94 @@
   .search-cust-name { font-size: 14px; font-weight: 600; color: var(--ink); }
   .search-cust-meta { font-size: 12px; color: var(--ink3); margin-top: 2px; }
   .search-cust-amount { font-size: 14px; font-weight: 700; color: var(--green2); }
+
+  /* 年度比較區塊 */
+  .compare-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .compare-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    flex-wrap: wrap;
+  }
+  .compare-header span { font-weight: 600; font-size: 14px; color: var(--ink); white-space: nowrap; }
+  .compare-year-select {
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'Noto Sans TC', sans-serif;
+    color: var(--ink);
+    background: var(--surface);
+    outline: none;
+  }
+  .compare-btn {
+    padding: 7px 18px;
+    background: var(--green);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'Noto Sans TC', sans-serif;
+    cursor: pointer;
+  }
+  .compare-btn:hover { background: var(--green2); }
+  .compare-body { padding: 20px; }
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .compare-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .compare-card-title {
+    font-size: 12px;
+    color: var(--ink3);
+    margin-bottom: 6px;
+  }
+  .compare-val-wrap { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+  .compare-val-a { font-size: 22px; font-weight: 700; color: var(--green); }
+  .compare-val-b { font-size: 22px; font-weight: 700; color: var(--ink2); }
+  .compare-diff-up   { font-size: 13px; color: #2D6A4F; font-weight: 600; }
+  .compare-diff-down { font-size: 13px; color: #c0392b; font-weight: 600; }
+  .compare-diff-flat { font-size: 13px; color: var(--ink3); }
+  .compare-sub-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 18px 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
+  .compare-table th {
+    padding: 8px 12px;
+    background: var(--green);
+    color: white;
+    font-weight: 600;
+    text-align: left;
+  }
+  .compare-table th.right { text-align: right; }
+  .compare-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .compare-table td.right { text-align: right; }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table tr:hover td { background: var(--green3); }
+  .compare-hint { padding: 30px; text-align: center; color: var(--ink3); font-size: 13px; }
+  .year-tag-a { display: inline-block; background: var(--green); color: white; border-radius: 4px; padding: 1px 7px; font-size: 12px; margin-right: 4px; }
+  .year-tag-b { display: inline-block; background: var(--ink2); color: white; border-radius: 4px; padding: 1px 7px; font-size: 12px; margin-right: 4px; }
 </style>
 </head>
 <body>
@@ -377,6 +465,20 @@
 </header>
 
 <main>
+  <!-- 年度比較 -->
+  <div class="compare-section">
+    <div class="compare-header">
+      <span>📊 年度比較</span>
+      <select class="compare-year-select" id="cmp-year-a"><option value="">選擇年份 A</option></select>
+      <span style="color:var(--ink3);font-size:13px;">vs</span>
+      <select class="compare-year-select" id="cmp-year-b"><option value="">選擇年份 B</option></select>
+      <button class="compare-btn" onclick="runCompare()">比較</button>
+    </div>
+    <div id="compare-body">
+      <div class="compare-hint">選擇兩個年份後按「比較」</div>
+    </div>
+  </div>
+
   <!-- 客戶搜尋 -->
   <div class="search-section">
     <div class="search-bar-wrap">
@@ -413,6 +515,208 @@
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbybC0nhwz_ELXYt-bWgG7V-Y8TTgtwW1pMTdy96JhI3ORYSjVuNC2chd0aze9QXUIw/exec';
 
+// ── 年度比較 ──
+function runCompare() {
+  const yearA = document.getElementById('cmp-year-a').value;
+  const yearB = document.getElementById('cmp-year-b').value;
+  const body  = document.getElementById('compare-body');
+
+  if (!yearA || !yearB) {
+    body.innerHTML = '<div class="compare-hint">請選擇兩個年份</div>';
+    return;
+  }
+  if (yearA === yearB) {
+    body.innerHTML = '<div class="compare-hint">請選擇不同的年份</div>';
+    return;
+  }
+  if (!reportData) {
+    body.innerHTML = '<div class="compare-hint">資料尚未載入，請稍後再試</div>';
+    return;
+  }
+
+  const mA = reportData.monthly.filter(function(m){ return m.month.startsWith(yearA); });
+  const mB = reportData.monthly.filter(function(m){ return m.month.startsWith(yearB); });
+
+  const totalA  = mA.reduce(function(s,m){ return s + m.amount; }, 0);
+  const totalB  = mB.reduce(function(s,m){ return s + m.amount; }, 0);
+  const orderA  = mA.reduce(function(s,m){ return s + m.count; }, 0);
+  const orderB  = mB.reduce(function(s,m){ return s + m.count; }, 0);
+  const avgA    = orderA > 0 ? Math.round(totalA / orderA) : 0;
+  const avgB    = orderB > 0 ? Math.round(totalB / orderB) : 0;
+
+  function diffHtml(a, b, prefix) {
+    if (b === 0) return '';
+    const pct = Math.round((a - b) / b * 100);
+    if (pct > 0)  return '<span class="compare-diff-up">▲ ' + (prefix||'') + pct + '%</span>';
+    if (pct < 0)  return '<span class="compare-diff-down">▼ ' + (prefix||'') + Math.abs(pct) + '%</span>';
+    return '<span class="compare-diff-flat">持平</span>';
+  }
+
+  // 月份對比表（Jan~Dec）
+  var monthRows = '';
+  for (var mo = 1; mo <= 12; mo++) {
+    var label = String(mo).padStart(2,'0');
+    var mDataA = mA.find(function(m){ return m.month.slice(5,7) === label; });
+    var mDataB = mB.find(function(m){ return m.month.slice(5,7) === label; });
+    if (!mDataA && !mDataB) continue;
+    var amtA = mDataA ? mDataA.amount : 0;
+    var amtB = mDataB ? mDataB.amount : 0;
+    var diff = amtA - amtB;
+    var diffStr = diff > 0
+      ? '<span class="compare-diff-up">▲ $' + Math.abs(diff).toLocaleString() + '</span>'
+      : diff < 0
+      ? '<span class="compare-diff-down">▼ $' + Math.abs(diff).toLocaleString() + '</span>'
+      : '<span class="compare-diff-flat">—</span>';
+    monthRows += '<tr>'
+      + '<td>' + mo + ' 月</td>'
+      + '<td class="right">$' + amtA.toLocaleString() + '</td>'
+      + '<td class="right">$' + amtB.toLocaleString() + '</td>'
+      + '<td class="right">' + diffStr + '</td>'
+      + '</tr>';
+  }
+
+  // 客戶排名對比（依消費額）
+  function buildCustMap(orders, year) {
+    var map = {};
+    if (!Array.isArray(orders)) return map;
+    orders.forEach(function(o) {
+      if (!(o.date||'').startsWith(year)) return;
+      if (!o.customerName) return;
+      if (!map[o.customerName]) map[o.customerName] = { amount: 0, count: 0 };
+      map[o.customerName].amount += (o.totalAmount || 0);
+      map[o.customerName].count++;
+    });
+    return map;
+  }
+
+  var custMapA = buildCustMap(allOrdersCache, yearA);
+  var custMapB = buildCustMap(allOrdersCache, yearB);
+  var allCusts = Array.from(new Set(Object.keys(custMapA).concat(Object.keys(custMapB))));
+  allCusts.sort(function(a,b){
+    var aA = (custMapA[a]||{}).amount||0;
+    var bA = (custMapA[b]||{}).amount||0;
+    return bA - aA;
+  });
+  var custRows = '';
+  allCusts.slice(0,10).forEach(function(name, i) {
+    var dA = custMapA[name] || { amount:0, count:0 };
+    var dB = custMapB[name] || { amount:0, count:0 };
+    var diff = dA.amount - dB.amount;
+    var diffStr = diff > 0
+      ? '<span class="compare-diff-up">▲ $' + Math.abs(diff).toLocaleString() + '</span>'
+      : diff < 0
+      ? '<span class="compare-diff-down">▼ $' + Math.abs(diff).toLocaleString() + '</span>'
+      : '<span class="compare-diff-flat">—</span>';
+    custRows += '<tr>'
+      + '<td>' + (i+1) + '. ' + name + '</td>'
+      + '<td class="right">$' + dA.amount.toLocaleString() + ' (' + dA.count + '筆)</td>'
+      + '<td class="right">$' + dB.amount.toLocaleString() + ' (' + dB.count + '筆)</td>'
+      + '<td class="right">' + diffStr + '</td>'
+      + '</tr>';
+  });
+
+  // 熱銷排名對比
+  function buildProductMap(orders, year) {
+    var map = {};
+    if (!Array.isArray(orders)) return map;
+    orders.forEach(function(o) {
+      if (!(o.date||'').startsWith(year)) return;
+      (o.items || []).forEach(function(item) {
+        var key = item.name || '';
+        if (!key) return;
+        if (!map[key]) map[key] = { qty: 0, amount: 0 };
+        map[key].qty    += (item.qty || 0);
+        map[key].amount += (item.price || 0) * (item.qty || 0);
+      });
+    });
+    return map;
+  }
+
+  var prodMapA = buildProductMap(allOrdersCache, yearA);
+  var prodMapB = buildProductMap(allOrdersCache, yearB);
+  var allProds = Array.from(new Set(Object.keys(prodMapA).concat(Object.keys(prodMapB))));
+  allProds.sort(function(a,b){
+    var aQ = (prodMapA[a]||{}).qty||0;
+    var bQ = (prodMapA[b]||{}).qty||0;
+    return bQ - aQ;
+  });
+  var prodRows = '';
+  allProds.slice(0,10).forEach(function(name, i) {
+    var dA = prodMapA[name] || { qty:0, amount:0 };
+    var dB = prodMapB[name] || { qty:0, amount:0 };
+    var diff = dA.qty - dB.qty;
+    var diffStr = diff > 0
+      ? '<span class="compare-diff-up">▲ ' + Math.abs(diff) + ' 盆</span>'
+      : diff < 0
+      ? '<span class="compare-diff-down">▼ ' + Math.abs(diff) + ' 盆</span>'
+      : '<span class="compare-diff-flat">—</span>';
+    prodRows += '<tr>'
+      + '<td>' + (i+1) + '. ' + name + '</td>'
+      + '<td class="right">' + dA.qty + ' 盆</td>'
+      + '<td class="right">' + dB.qty + ' 盆</td>'
+      + '<td class="right">' + diffStr + '</td>'
+      + '</tr>';
+  });
+
+  var tagA = '<span class="year-tag-a">' + yearA + '</span>';
+  var tagB = '<span class="year-tag-b">' + yearB + '</span>';
+
+  var html = '<div class="compare-body">';
+
+  // 總覽卡片
+  html += '<div class="compare-grid">';
+  html += '<div class="compare-card"><div class="compare-card-title">年度總營業額</div>'
+    + '<div class="compare-val-wrap">'
+    + tagA + '<span class="compare-val-a">$' + totalA.toLocaleString() + '</span>'
+    + tagB + '<span class="compare-val-b">$' + totalB.toLocaleString() + '</span>'
+    + diffHtml(totalA, totalB) + '</div></div>';
+  html += '<div class="compare-card"><div class="compare-card-title">年度總訂單數</div>'
+    + '<div class="compare-val-wrap">'
+    + tagA + '<span class="compare-val-a">' + orderA + ' 筆</span>'
+    + tagB + '<span class="compare-val-b">' + orderB + ' 筆</span>'
+    + diffHtml(orderA, orderB) + '</div></div>';
+  html += '<div class="compare-card"><div class="compare-card-title">平均客單價</div>'
+    + '<div class="compare-val-wrap">'
+    + tagA + '<span class="compare-val-a">$' + avgA.toLocaleString() + '</span>'
+    + tagB + '<span class="compare-val-b">$' + avgB.toLocaleString() + '</span>'
+    + diffHtml(avgA, avgB) + '</div></div>';
+  html += '</div>';
+
+  // 月份對比
+  html += '<div class="compare-sub-title">月營收比較</div>';
+  if (monthRows) {
+    html += '<table class="compare-table"><thead><tr>'
+      + '<th>月份</th><th class="right">' + tagA + yearA + '</th><th class="right">' + tagB + yearB + '</th><th class="right">差異</th>'
+      + '</tr></thead><tbody>' + monthRows + '</tbody></table>';
+  } else {
+    html += '<div class="compare-hint">無月份資料</div>';
+  }
+
+  // 客戶排名對比
+  html += '<div class="compare-sub-title">客戶消費排名比較（Top 10）</div>';
+  if (custRows) {
+    html += '<table class="compare-table"><thead><tr>'
+      + '<th>客戶</th><th class="right">' + tagA + yearA + '</th><th class="right">' + tagB + yearB + '</th><th class="right">差異</th>'
+      + '</tr></thead><tbody>' + custRows + '</tbody></table>';
+  } else {
+    html += '<div class="compare-hint">無客戶資料</div>';
+  }
+
+  // 熱銷排名對比
+  html += '<div class="compare-sub-title">熱銷商品排名比較（Top 10）</div>';
+  if (prodRows) {
+    html += '<table class="compare-table"><thead><tr>'
+      + '<th>商品</th><th class="right">' + tagA + yearA + '</th><th class="right">' + tagB + yearB + '</th><th class="right">差異</th>'
+      + '</tr></thead><tbody>' + prodRows + '</tbody></table>';
+  } else {
+    html += '<div class="compare-hint">無商品資料</div>';
+  }
+
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+
 let reportData = null;
 
 async function loadReport() {
@@ -431,6 +735,18 @@ async function loadReport() {
       opt.value = y; opt.textContent = y + ' 年';
       sel.appendChild(opt);
     });
+    // 填入年度比較選單
+    const cmpA = document.getElementById('cmp-year-a');
+    const cmpB = document.getElementById('cmp-year-b');
+    cmpA.innerHTML = '<option value="">選擇年份 A</option>';
+    cmpB.innerHTML = '<option value="">選擇年份 B</option>';
+    years.forEach(function(y) {
+      cmpA.innerHTML += '<option value="' + y + '">' + y + ' 年</option>';
+      cmpB.innerHTML += '<option value="' + y + '">' + y + ' 年</option>';
+    });
+    // 預設選最近兩年
+    if (years.length >= 1) cmpA.value = years[0];
+    if (years.length >= 2) cmpB.value = years[1];
     // 預先撈所有訂單，補充上次叫貨日期
     let allOrders = [];
     try {
@@ -540,7 +856,7 @@ function renderReport(year) {
   // 客戶消費總覽（全部，分頁）
   html += '<div class="section" id="cust-table-section">';
   html += '<div class="section-header"><span>👑</span>客戶消費總覽 <span id="cust-page-label" style="font-size:11px;font-weight:400;color:var(--ink3);margin-left:8px;"></span></div>';
-  html += '<table><thead><tr><th>排名</th><th>客戶</th><th class="right">消費額</th><th class="right">訂單數</th><th class="right">上次補貨</th></tr></thead><tbody id="cust-table-body"></tbody></table>';
+  html += '<table><thead><tr><th>排名</th><th>客戶</th><th class="right">消費額</th><th class="right">訂單數</th><th class="right">上次叫貨</th></tr></thead><tbody id="cust-table-body"></tbody></table>';
   html += '<div id="cust-pagination" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 16px;border-top:1px solid var(--border);"></div>';
   html += '</div>';
 
