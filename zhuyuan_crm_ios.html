@@ -344,7 +344,15 @@ body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Noto
   <div class="modal">
     <div class="modal-title">輸入客製金額</div>
     <div style="font-size:14px;color:var(--ink2);margin-bottom:12px;">品項：<span id="custom-price-name" style="font-weight:500;"></span></div>
-    <input class="modal-input" id="custom-price-input" type="number" placeholder="輸入金額，例如 1200" inputmode="numeric" />
+    <input class="modal-input" id="custom-price-input" type="number" placeholder="輸入金額，例如 450" inputmode="numeric" />
+    <div style="display:flex;align-items:center;gap:12px;margin:8px 0;">
+      <label style="font-size:14px;color:var(--ink2);white-space:nowrap;">數量：</label>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="qty-btn" onclick="adjustCustomQty(-1)">−</button>
+        <span id="custom-qty-display" style="font-size:18px;font-weight:600;min-width:32px;text-align:center;">1</span>
+        <button class="qty-btn" onclick="adjustCustomQty(1)">＋</button>
+      </div>
+    </div>
     <button class="btn btn-primary" onclick="submitCustomPrice()">加入購物車</button>
     <button class="btn btn-ghost" style="margin-top:8px;" onclick="closeModal('modal-custom-price')">取消</button>
   </div>
@@ -742,11 +750,19 @@ function adjustProductQty(cat, name, price, delta) {
   updateBottomBar();
 }
 
+function adjustCustomQty(delta) {
+  const el = document.getElementById('custom-qty-display');
+  const current = parseInt(el.textContent) || 1;
+  const next = Math.max(1, current + delta);
+  el.textContent = next;
+}
+
 function openCustomPrice(cat, name) {
   document.getElementById('custom-price-name').textContent = name;
   document.getElementById('custom-price-input').value = '';
   document.getElementById('modal-custom-price').dataset.cat = cat;
   document.getElementById('modal-custom-price').dataset.name = name;
+  document.getElementById('custom-qty-display').textContent = '1';
   document.getElementById('modal-custom-price').classList.remove('hidden');
   setTimeout(() => document.getElementById('custom-price-input').focus(), 100);
 }
@@ -766,7 +782,8 @@ function submitCustomPrice() {
   if (!cart[uniqueKey]) {
     cart[uniqueKey] = { name: name + '（$' + price + '）', price, qty: 0, category: cat };
   }
-  cart[uniqueKey].qty += 1;
+  const qty = parseInt(document.getElementById('custom-qty-display').textContent) || 1;
+  cart[uniqueKey].qty += qty;
   delete cart[key]; // 移除無價格的佔位
   renderProductGrid();
   updateBottomBar();
@@ -1265,83 +1282,9 @@ function diagnosePrinter() {
   alert('印表機診斷：\n' + msg);
 }
 
-async function shareToLine() {
-  const items = cartItems();
-  const totalQty = cartQty();
-  const totalAmt = cartTotal();
-  const now = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  const dateStr = now.getFullYear() + '/' + pad(now.getMonth()+1) + '/' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes());
-
-  const PX = 2;
-  const W = 384 * PX;
-  const MARGIN = 20 * PX;
-  const FONT_LG = 40 * PX;
-  const FONT_MD = 32 * PX;
-  const FONT_SM = 26 * PX;
-  const LINE_LG = 58 * PX;
-  const LINE_MD = 46 * PX;
-  const LINE_SM = 38 * PX;
-
-  var lineCount = 7 + (items.length * 2) + 5;
-  var H = (lineCount * LINE_SM) + 200 * PX;
-  var canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  var ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#000000'; ctx.textBaseline = 'top';
-  var y = MARGIN;
-
-  function dc(text, fontSize, lineHeight) {
-    ctx.font = 'bold ' + fontSize + 'px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(text, W / 2, y); y += lineHeight;
-  }
-  function dl(text, fontSize, lineHeight, bold) {
-    ctx.font = (bold ? 'bold ' : '') + fontSize + 'px Arial, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(text, MARGIN, y); y += lineHeight;
-  }
-  function dr(text, fontSize, lineHeight, bold) {
-    ctx.font = (bold ? 'bold ' : '') + fontSize + 'px Arial, sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(text, W - MARGIN, y); y += lineHeight;
-  }
-  function dline() {
-    ctx.strokeStyle = '#000000'; ctx.lineWidth = PX;
-    ctx.setLineDash([5*PX, 5*PX]);
-    ctx.beginPath(); ctx.moveTo(MARGIN, y + LINE_SM/2); ctx.lineTo(W - MARGIN, y + LINE_SM/2); ctx.stroke();
-    ctx.setLineDash([]); y += LINE_SM;
-  }
-
-  dc('竹緣開運竹', FONT_LG, LINE_LG);
-  dc('結帳單', FONT_MD, LINE_MD);
-  dl(dateStr, FONT_SM, LINE_SM, false);
-  dl('客戶名稱：' + currentCustomer.name, FONT_SM, LINE_SM, false);
-  dline();
-  dl('品名', FONT_SM, LINE_SM, false);
-  dr('單價 x數量 = 金額', FONT_SM, LINE_SM, false);
-  dline();
-  items.forEach(function(i) {
-    dl(String(i.name), FONT_SM, LINE_SM, false);
-    dr('$' + i.price + ' x' + i.qty + ' = $' + (i.price * i.qty), FONT_SM, LINE_SM, false);
-  });
-  dline();
-  dl('共 ' + totalQty + ' 盆', FONT_MD, LINE_MD, true);
-  dr('總計：$' + totalAmt + '元', FONT_MD, LINE_MD, true);
-  y += LINE_SM * 3;
-
-  var fc = document.createElement('canvas');
-  fc.width = W; fc.height = y + MARGIN;
-  fc.getContext('2d').drawImage(canvas, 0, 0);
-
-  fc.toBlob(async function(blob) {
-    if (!blob) return;
-    var file = new File([blob], 'receipt.png', { type: 'image/png' });
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file] }); } catch(e) {}
-    }
-  }, 'image/png');
+function shareToLine() {
+  const text = receiptText();
+  window.open('https://line.me/R/share?text=' + encodeURIComponent(text), '_blank');
 }
 
 function shareReprintToLine(dateStr, customerName, items, totalQty, totalAmt) {
