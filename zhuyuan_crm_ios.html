@@ -803,17 +803,19 @@ function cartItems() {
 function renderCartReview() {
   const items = cartItems();
   const review = document.getElementById('cart-review');
-  review.innerHTML = items.map((item, idx) => `
+  review.innerHTML = items.map((item) => {
+    const k = item._key;
+    return `
     <div class="cart-row">
       <div class="cart-item-name">${item.name}</div>
       <div class="qty-ctrl">
-        <button class="qty-btn" onclick="adjustQty(this.dataset.key,-1)" data-key="${item._key}">−</button>
+        <button class="qty-btn" onclick="adjustQty('${k}',-1)">−</button>
         <div class="qty-num">${item.qty}</div>
-        <button class="qty-btn" onclick="adjustQty(this.dataset.key,1)" data-key="${item._key}">+</button>
+        <button class="qty-btn" onclick="adjustQty('${k}',1)">+</button>
       </div>
       <div class="cart-item-price">$${(item.price * item.qty).toLocaleString()}</div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 
   const total = cartTotal();
   const qty = cartQty();
