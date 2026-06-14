@@ -796,7 +796,7 @@ function cartQty() {
   return Object.values(cart).reduce((s, i) => s + i.qty, 0);
 }
 function cartItems() {
-  return Object.values(cart);
+  return Object.entries(cart).map(([k, v]) => Object.assign({}, v, { _key: k }));
 }
 
 // ── Cart Review ──
@@ -807,9 +807,9 @@ function renderCartReview() {
     <div class="cart-row">
       <div class="cart-item-name">${item.name}</div>
       <div class="qty-ctrl">
-        <button class="qty-btn" onclick="adjustQty('${item.category}|${item.name}',-1)">−</button>
+        <button class="qty-btn" onclick="adjustQty(this.dataset.key,-1)" data-key="${item._key}">−</button>
         <div class="qty-num">${item.qty}</div>
-        <button class="qty-btn" onclick="adjustQty('${item.category}|${item.name}',1)">+</button>
+        <button class="qty-btn" onclick="adjustQty(this.dataset.key,1)" data-key="${item._key}">+</button>
       </div>
       <div class="cart-item-price">$${(item.price * item.qty).toLocaleString()}</div>
     </div>
