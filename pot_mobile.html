@@ -1,16 +1,3 @@
-<!-- 
-================================================================
-【手機版】盆器庫存管理系統 - 前端 HTML
-================================================================
-用途：手機版庫存查詢 + 成本計算
-搭配：盆器庫存系統_mobile_AppsScript.js（手機版後端）
-部署：GitHub Pages → bamgreen196/zhuyuan-crm/pot_mobile.html
-網址：https://bamgreen196.github.io/zhuyuan-crm/pot_mobile.html
-================================================================
-注意：此為精簡版，不含出庫掃碼/入庫/待退等操作功能
-      使用 fetch() 呼叫 Apps Script API，不依賴 google.script.run
-================================================================
--->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -197,10 +184,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
         <label>型號名稱</label>
         <input type="text" id="costModelName" placeholder="例：308、508大紅…">
       </div>
-      <div class="form-group">
-        <label>備註</label>
-        <input type="text" id="costModelNote" placeholder="選填，例：適用場合、特殊說明...">
-      </div>
     </div>
 
     <div class="card">
@@ -248,10 +231,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 
     <div class="card">
       <div class="card-title">📋 已儲存型號</div>
-      <div style="display:flex;gap:10px;margin-bottom:14px;">
-        <input type="text" id="costModelSearch" placeholder="搜尋型號名稱或備註..." style="flex:1;" oninput="filterCostModels()">
-        <button class="btn btn-gray btn-sm" onclick="document.getElementById('costModelSearch').value='';filterCostModels()">✕</button>
-      </div>
       <div id="costModelList"><div class="loading"><div class="spinner"></div><br>載入中...</div></div>
     </div>
   </div>
@@ -296,16 +275,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 
 <script>
 // ── API 設定 ──
-let _allCostModels = [];
 let API_URL = localStorage.getItem('potMobileApiUrl') || 'https://script.google.com/macros/s/AKfycbykFf-hEqrgtNmVBfhYUxmANwc2cRNBeVJU2K0iHWMP0VXflxzu11Pq1VJWoTUUXFOBAQ/exec';
 let allItems = [];
 let bambooSizes = [], accessories = [];
-
-// ── 日期格式化 ──
-function formatDate(d) {
-  if (!d) return '';
-  return String(d).substring(0, 10);
-}
 
 // ── API 呼叫 ──
 async function apiGet(action) {
@@ -381,7 +353,7 @@ function renderStock(items) {
     '<div>' +
     '<div class="si-name">' + i.name + ' <span style="font-size:15px;color:#888">/ ' + i.color + '</span>' +
     (i.isLow ? '<span class="low-badge">不足</span>' : '') + '</div>' +
-    '<div class="si-sub">廠商：' + (i.vendor || '—') + '　$' + (i.price || 0) + '</div>' +
+    '<div class="si-sub">廠商：' + (i.vendor || '—') + '　貨號：' + (i.vendorCode || '—') + '　$' + (i.price || 0) + '</div>' +
     '</div>' +
     '<div>' +
     '<div class="si-num">' + i.stock + '</div>' +
@@ -493,8 +465,7 @@ async function saveCostModel() {
   }).filter(Boolean);
   const total = bamboo.reduce((s,b)=>s+b.qty*b.price,0) + potPrice + accData.reduce((s,a)=>s+a.qty*a.price,0);
   try {
-    const note = document.getElementById('costModelNote') ? document.getElementById('costModelNote').value.trim() : '';
-    const res = await apiPost('saveCostModel', { data: { name, bamboo, potName, potPrice, accData, total, note } });
+    const res = await apiPost('saveCostModel', { data: { name, bamboo, potName, potPrice, accData, total } });
     if (!res.success) throw new Error(res.error);
     alert('✅ 型號「' + name + '」已' + (res.isNew ? '新增' : '更新') + '儲存');
     await loadCostModels();
@@ -512,46 +483,25 @@ async function loadCostModels() {
   }
 }
 
-function filterCostModels() {
-  const kw = (document.getElementById('costModelSearch').value || '').trim().toLowerCase();
-  const filtered = kw
-    ? _allCostModels.filter(m =>
-        m.name.toLowerCase().includes(kw) ||
-        (m.note && m.note.toLowerCase().includes(kw))
-      )
-    : _allCostModels;
-  renderCostModelList(filtered, true);
-}
-
-function renderCostModelList(models, skipSave) {
-  if (!skipSave) _allCostModels = models || [];
+function renderCostModelList(models) {
   const el = document.getElementById('costModelList');
-  if (!models || !models.length) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">&#128194;</div><p>尚無儲存型號</p></div>';
-    return;
-  }
-  let html = '';
-  models.forEach((m, i) => {
-    const cost = m.total % 1 === 0 ? m.total : m.total.toFixed(2);
-    const sub  = formatDate(m.updatedAt) + (m.note ? ' ｜ ' + m.note : '');
-    html += '<div class="model-item" onclick="loadCostModel(' + i + ')">';
-    html += '<div style="flex:1;min-width:0;">';
-    html += '<div class="m-name">' + m.name + '</div>';
-    html += '<div class="m-sub">' + sub + '</div>';
-    html += '</div>';
-    html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-left:12px;flex-shrink:0;">';
-    html += '<div class="m-cost">$' + cost + '</div>';
-    html += '<button class="btn btn-red btn-sm" onclick="event.stopPropagation();delModel(' + i + ')">刪除</button>';
-    html += '</div></div>';
-  });
-  el.innerHTML = html;
+  if (!models || !models.length) { el.innerHTML = '<div class="empty-state"><div class="icon">📂</div><p>尚無儲存型號</p></div>'; return; }
+  el.innerHTML = models.map((m, i) => {
+    const tags    = (m.bamboo  || []).map(b => '<span class="model-tag">' + b.name.replace('開運竹','') + '×' + b.qty + '</span>').join('');
+    const accTags = (m.accData || []).map(a => '<span class="model-tag">' + a.name + '×' + a.qty + '</span>').join('');
+    const potTag  = m.potName ? '<span class="model-tag">🪴' + m.potName + '</span>' : '';
+    return '<div class="model-item" onclick="loadCostModel(' + i + ')">' +
+      '<div style="flex:1;min-width:0;">' +
+      '<div class="m-name">' + m.name + '</div>' +
+      '<div style="margin:6px 0;">' + tags + potTag + accTags + '</div>' +
+      '<div class="m-sub">' + m.updatedAt + '</div>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-left:12px;flex-shrink:0;">' +
+      '<div class="m-cost">$' + (m.total % 1 === 0 ? m.total : m.total.toFixed(2)) + '</div>' +
+      '<button class="btn btn-red btn-sm" onclick="event.stopPropagation();confirmDeleteModel(\'' + m.name + '\')">刪除</button>' +
+      '</div></div>';
+  }).join('');
 }
-
-function delModel(i) {
-  if (!_allCostModels[i]) return;
-  confirmDeleteModel(_allCostModels[i].name);
-}
-
 
 async function loadCostModel(i) {
   try {
@@ -559,7 +509,6 @@ async function loadCostModel(i) {
     if (!res.success || !res.models || !res.models[i]) return;
     const m = res.models[i];
     document.getElementById('costModelName').value = m.name;
-    if (document.getElementById('costModelNote')) document.getElementById('costModelNote').value = m.note || '';
     bambooSizes.forEach((_, j) => { const el = document.getElementById('cb' + j); if (el) el.value = ''; });
     (m.bamboo || []).forEach(b => {
       const idx = bambooSizes.findIndex(s => s.name === b.name);
@@ -588,7 +537,6 @@ async function confirmDeleteModel(name) {
 
 function clearCost() {
   document.getElementById('costModelName').value = '';
-  if (document.getElementById('costModelNote')) document.getElementById('costModelNote').value = '';
   bambooSizes.forEach((_, i) => { const el = document.getElementById('cb' + i); if (el) el.value = ''; });
   document.getElementById('costPotSelect').value = '';
   document.getElementById('costPotName').value   = '';
