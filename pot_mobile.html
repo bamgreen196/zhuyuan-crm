@@ -690,7 +690,7 @@ function renderLog(items, dateStr) {
   items.forEach(i => {
     const isCancel = i.type === '取消出庫';
     const qtyColor = isCancel ? '#2d7d46' : '#c0392b';
-    const qtyText  = isCancel ? '+1' : '−1';
+    const qtyText  = isCancel ? '+' + i.qty : '−' + i.qty;
     const barcode  = i.barcode || i.sku || '';
     html += '<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0;">';
     html += '<div style="flex:1;min-width:0;">';
