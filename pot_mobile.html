@@ -177,7 +177,28 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   </div>
 
   <!-- ══ 成本計算 ══ -->
-  <div id="costPage" class="page">
+  
+<div id="logPage" class="page">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:17px;font-weight:700;color:#2d7d46;">今日出庫記錄</div>
+      <div id="logStatus" style="font-size:12px;color:#888;">載入中...</div>
+    </div>
+    <div id="latestCard" style="display:none;background:#e8f5ec;border-radius:10px;padding:12px 14px;border-left:3px solid #2d7d46;margin-bottom:14px;">
+      <div style="font-size:11px;color:#2d7d46;margin-bottom:4px;font-weight:600;">最新一筆</div>
+      <div id="latestName" style="font-size:17px;font-weight:700;color:#1a5c30;"></div>
+      <div id="latestMeta" style="font-size:13px;color:#2d7d46;margin-top:2px;"></div>
+      <div id="latestTime" style="font-size:12px;color:#555;margin-top:3px;"></div>
+    </div>
+    <div id="logList"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid #e0e0e0;">
+      <div id="logTotal" style="font-size:13px;color:#666;"></div>
+      <button class="btn btn-gray btn-sm" onclick="loadLog()">手動更新</button>
+    </div>
+  </div>
+</div>
+
+<div id="costPage" class="page">
     <div class="card">
       <div class="card-title">🧮 成本計算</div>
       <div class="form-group">
@@ -265,6 +286,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   <button class="active" onclick="switchPage('stockPage',this)">
     <span class="icon">🔍</span>庫存查詢
   </button>
+  <button onclick="switchPage('logPage',this)">
+    <span class="icon">📤</span>出庫記錄
+  </button>
   <button onclick="switchPage('costPage',this)">
     <span class="icon">🧮</span>成本計算
   </button>
@@ -307,6 +331,8 @@ function switchPage(id, btn) {
   if (id === 'stockPage')   loadStock();
   if (id === 'costPage')    initCostPage();
   if (id === 'settingPage') loadSettings();
+  if (id === 'logPage')     { loadLog(); startLogPolling(); }
+  else stopLogPolling();
 }
 
 // ── 庫存查詢 ──
@@ -578,6 +604,110 @@ window.onload = () => {
     document.getElementById('stockList').innerHTML = '<div class="empty-state"><div class="icon">⚙️</div><p>請先點右下角「設定」輸入 Apps Script 網址</p></div>';
   }
 };
+
+// ── 出庫記錄 ──
+let _logTimer = null;
+
+function startLogPolling() {
+  stopLogPolling();
+  _logTimer = setInterval(loadLog, 5000);
+}
+
+function stopLogPolling() {
+  if (_logTimer) { clearInterval(_logTimer); _logTimer = null; }
+}
+
+async function loadLog() {
+  const statusEl = document.getElementById('logStatus');
+  if (!API_URL) {
+    document.getElementById('logList').innerHTML = '<div class="empty-state"><p>請先在設定頁輸入 API 網址</p></div>';
+    return;
+  }
+  if (statusEl) statusEl.textContent = '更新中...';
+  try {
+    const today = new Date();
+    const dateStr = today.getFullYear() + '/' +
+      String(today.getMonth()+1).padStart(2,'0') + '/' +
+      String(today.getDate()).padStart(2,'0');
+    const res = await api.apiGet('getStockLog&date=' + encodeURIComponent(dateStr));
+    if (!res.success) throw new Error(res.error);
+    renderLog(res.items, dateStr);
+    if (statusEl) {
+      const t = new Date();
+      statusEl.textContent = '更新於 ' + String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0') + ':' + String(t.getSeconds()).padStart(2,'0');
+    }
+  } catch(e) {
+    if (statusEl) statusEl.textContent = '載入失敗';
+  }
+}
+
+function renderLog(items, dateStr) {
+  const latestCard = document.getElementById('latestCard');
+  const listEl     = document.getElementById('logList');
+  const totalEl    = document.getElementById('logTotal');
+
+  if (!items || !items.length) {
+    if (latestCard) latestCard.style.display = 'none';
+    listEl.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>今日尚無出庫記錄</p></div>';
+    if (totalEl) totalEl.textContent = '';
+    return;
+  }
+
+  // 最新一筆
+  const latest = items[0];
+  if (latestCard) {
+    latestCard.style.display = 'block';
+    document.getElementById('latestName').textContent = latest.name + (latest.color ? ' / ' + latest.color : '');
+    document.getElementById('latestMeta').textContent = (latest.vendorCode ? '貨號：' + latest.vendorCode + '　' : '') + '剩餘：' + latest.stock;
+    document.getElementById('latestTime').textContent = latest.type === '取消出庫' ? '↩ 取消出庫　' + latest.time : latest.time;
+  }
+
+  // 出庫統計
+  const outCount = items.filter(i => i.type === '出庫').length;
+  if (totalEl) totalEl.textContent = '今日共出庫 ' + outCount + ' 筆';
+
+  // 列表
+  let html = '';
+  items.forEach(i => {
+    const isCancel = i.type === '取消出庫';
+    const qtyColor = isCancel ? '#2d7d46' : '#c0392b';
+    const qtyText  = isCancel ? '+1' : '−1';
+    const barcode  = i.barcode || i.sku || '';
+    html += '<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0;">';
+    html += '<div style="flex:1;min-width:0;">';
+    html += '<div style="font-size:15px;font-weight:700;">' + i.name + (i.color ? ' / ' + i.color : '') + '</div>';
+    if (isCancel) {
+      html += '<div style="font-size:12px;color:#888;">取消出庫</div>';
+    } else {
+      html += '<div style="font-size:12px;color:#888;">' + (i.vendorCode ? '貨號：' + i.vendorCode + '　' : '') + '剩餘：' + i.stock + '</div>';
+    }
+    html += '<div style="font-size:11px;color:#aaa;margin-top:1px;">' + i.time + '</div>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">';
+    html += '<div style="font-size:20px;font-weight:700;color:' + qtyColor + ';">' + qtyText + '</div>';
+    if (!isCancel && barcode) {
+      html += '<button onclick="cancelLog(\'' + barcode + '\',this)" style="font-size:18px;background:none;border:none;color:#999;cursor:pointer;padding:4px;">↩</button>';
+    }
+    html += '</div></div>';
+  });
+  listEl.innerHTML = html;
+}
+
+async function cancelLog(barcode, btn) {
+  if (!confirm('確定取消這筆出庫？')) return;
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  try {
+    const res = await api.apiPost('cancelStockOut', { barcode });
+    if (!res.success) throw new Error(res.error);
+    loadLog();
+  } catch(e) {
+    alert('❌ ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '↩';
+  }
+}
+
 </script>
 </body>
 </html>
