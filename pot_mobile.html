@@ -653,8 +653,23 @@ function renderLog(items, dateStr) {
     return;
   }
 
+  // 記錄最新一筆（合併前）
+  const latestRaw = items[0];
+
+  // 同類型合併（品名+顏色+廠商貨號+類型），取消出庫在小計裡與出庫相抵
+  const mergedMap = {};
+  items.forEach(i => {
+    const key = i.name + '|' + i.color + '|' + (i.vendorCode || '') + '|' + i.type;
+    if (mergedMap[key]) {
+      mergedMap[key].qty += i.qty;
+    } else {
+      mergedMap[key] = Object.assign({}, i);
+    }
+  });
+  items = Object.values(mergedMap).sort((a, b) => b.time.localeCompare(a.time));
+
   // 最新一筆
-  const latest = items[0];
+  const latest = latestRaw;
   if (latestCard) {
     latestCard.style.display = 'block';
     document.getElementById('latestName').textContent = latest.name + (latest.color ? ' / ' + latest.color : '');
@@ -663,7 +678,11 @@ function renderLog(items, dateStr) {
   }
 
   // 出庫統計
-  const outCount = items.filter(i => i.type === '出庫').length;
+  let outCount = 0;
+  items.forEach(i => {
+    if (i.type === '出庫') outCount += i.qty;
+    else if (i.type === '取消出庫') outCount -= i.qty;
+  });
   if (totalEl) totalEl.textContent = '今日共出庫 ' + outCount + ' 筆';
 
   // 列表
