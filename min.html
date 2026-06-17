@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>恩主公社區健康學苑｜系統平台原型</title>
+<style>
+  :root{
+    --bg:#EEF2F0;
+    --surface:#FFFFFF;
+    --surface-2:#F6F8F7;
+    --line:#DCE4E0;
+    --jade:#1F5C4D;
+    --jade-dark:#143F34;
+    --jade-soft:#2E7D6B;
+    --jade-tint:#E3EFEA;
+    --amber:#C2823A;
+    --amber-tint:#FBF1E4;
+    --red:#BC4534;
+    --red-tint:#FBEAE7;
+    --blue:#2E5E86;
+    --blue-tint:#E7EFF6;
+    --ink:#1A2420;
+    --ink-2:#4A554F;
+    --ink-3:#7A857F;
+    --radius:12px;
+    --shadow:0 1px 2px rgba(20,40,30,.06), 0 8px 24px rgba(20,40,30,.05);
+    --font:"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  a{color:inherit}
+
+  /* ---------- Layout ---------- */
+  .app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+  .sidebar{background:var(--jade-dark);color:#D7E5DF;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  .main{display:flex;flex-direction:column;min-width:0}
+
+  /* ---------- Sidebar ---------- */
+  .brand{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .brand .logo{display:flex;align-items:center;gap:10px}
+  .brand .mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(150deg,var(--jade-soft),#3f9c86);display:grid;place-items:center;font-weight:800;color:#fff;font-size:15px;flex:none}
+  .brand h1{font-size:14.5px;font-weight:700;color:#fff;let-spacing:.2px}
+  .brand .sub{font-size:11px;color:#8FB3A8;margin-top:1px}
+
+  .nav{padding:10px 10px;overflow-y:auto;flex:1}
+  .nav .group{font-size:10.5px;letter-spacing:1.5px;color:#6E9389;text-transform:uppercase;padding:14px 10px 6px;font-weight:700}
+  .nav button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:none;border:0;color:#C2D6CE;padding:9px 11px;border-radius:9px;font-size:13.5px;line-height:1.2;transition:.15s}
+  .nav button svg{width:18px;height:18px;flex:none;opacity:.85}
+  .nav button:hover{background:rgba(255,255,255,.06);color:#fff}
+  .nav button.active{background:var(--jade-soft);color:#fff;font-weight:600}
+  .nav button.active svg{opacity:1}
+  .nav button:disabled{opacity:.34;cursor:not-allowed}
+  .nav button .lock{margin-left:auto;font-size:11px;opacity:.7}
+
+  .side-foot{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:#6E9389}
+
+  /* ---------- Topbar ---------- */
+  .topbar{background:var(--surface);border-bottom:1px solid var(--line);padding:0 26px;height:62px;display:flex;align-items:center;gap:18px;position:sticky;top:0;z-index:40}
+  .topbar .crumb{font-size:13px;color:var(--ink-3)}
+  .topbar .crumb b{color:var(--ink);font-weight:700;font-size:15px}
+  .topbar .spacer{flex:1}
+  .topbar .date{font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);padding:6px 12px;border-radius:8px}
+  .role-switch{display:flex;align-items:center;gap:9px}
+  .role-switch label{font-size:12px;color:var(--ink-3)}
+  .role-switch select{font-family:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);padding:7px 10px;border-radius:8px;color:var(--ink);font-weight:600}
+  .avatar{width:34px;height:34px;border-radius:50%;background:var(--jade-tint);color:var(--jade);display:grid;place-items:center;font-weight:700;font-size:13px}
+
+  /* ---------- Content ---------- */
+  .content{padding:24px 26px 60px;max-width:1240px;width:100%}
+  .page{display:none;animation:fade .25s ease}
+  .page.show{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .page-head{margin-bottom:18px}
+  .page-head h2{font-size:21px;font-weight:800;letter-spacing:.3px}
+  .page-head p{color:var(--ink-2);margin-top:4px;font-size:13.5px;max-width:760px}
+
+  .perm-banner{display:flex;align-items:center;gap:10px;background:var(--amber-tint);border:1px solid #EBD3AE;color:#7A5418;padding:9px 14px;border-radius:10px;font-size:12.5px;margin-bottom:18px}
+  .perm-banner svg{width:16px;height:16px;flex:none}
+  .perm-banner b{font-weight:700}
+
+  /* cards & grid */
+  .grid{display:grid;gap:16px}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .card .pad{padding:18px}
+  .card-h{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--line)}
+  .card-h h3{font-size:14.5px;font-weight:700}
+  .card-h .tag{font-size:11px;color:var(--ink-3)}
+
+  /* KPI */
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 17px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .kpi .lab{font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:7px}
+  .kpi .lab .ic{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex:none}
+  .kpi .val{font-size:27px;font-weight:800;margin-top:9px;letter-spacing:.5px}
+  .kpi .delta{font-size:11.5px;margin-top:3px;font-weight:600}
+  .up{color:var(--jade-soft)} .down{color:var(--red)}
+  .ic-j{background:var(--jade-tint);color:var(--jade)} .ic-a{background:var(--amber-tint);color:var(--amber)}
+  .ic-b{background:var(--blue-tint);color:var(--blue)} .ic-r{background:var(--red-tint);color:var(--red)}
+
+  /* badges */
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:20px;line-height:1.4}
+  .b-green{background:var(--jade-tint);color:var(--jade)}
+  .b-amber{background:var(--amber-tint);color:#946022}
+  .b-red{background:var(--red-tint);color:var(--red)}
+  .b-blue{background:var(--blue-tint);color:var(--blue)}
+  .b-grey{background:#EEF1EF;color:var(--ink-3)}
+  .dot{width:7px;height:7px;border-radius:50%;flex:none}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11.5px;letter-spacing:.5px;color:var(--ink-3);font-weight:700;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+  td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--surface-2)}
+  .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:9px;font-size:13px;font-weight:600;transition:.15s}
+  .btn:hover{border-color:var(--jade-soft)}
+  .btn.primary{background:var(--jade);border-color:var(--jade);color:#fff}
+  .btn.primary:hover{background:var(--jade-soft);border-color:var(--jade-soft)}
+  .btn.amber{background:var(--amber);border-color:var(--amber);color:#fff}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--jade-soft)}
+  .btn.sm{padding:5px 10px;font-size:12px}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+
+  input,select.fld{font-family:inherit;font-size:13.5px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;width:100%;color:var(--ink);background:var(--surface)}
+  input:focus,select.fld:focus{outline:2px solid var(--jade-tint);border-color:var(--jade-soft)}
+  label.f{font-size:12px;color:var(--ink-2);font-weight:600;display:block;margin-bottom:6px}
+  .field{margin-bottom:14px}
+
+  /* search */
+  .searchbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+  .searchbar .sinput{position:relative;flex:1;min-width:220px}
+  .searchbar .sinput svg{}
+  .searchbar .sinput svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--ink-3)}
+  .searchbar .sinput input{padding-left:36px}
+
+  /* toast / popup */
+  .toast-wrap{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column;gap:10px;z-index:90}
+  .toast{background:var(--ink);color:#fff;padding:12px 16px;border-radius:11px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px;max-width:330px;animation:pop .25s ease}
+  .toast.warn{background:var(--red)} .toast.ok{background:var(--jade)}
+  @keyframes pop{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(20,40,30,.45);display:none;place-items:center;z-index:80;padding:20px}
+  .modal-bg.show{display:grid}
+  .modal{background:var(--surface);border-radius:14px;max-width:420px;width:100%;box-shadow:0 30px 60px rgba(0,0,0,.3);overflow:hidden;animation:pop .2s}
+  .modal .mh{padding:18px 20px;display:flex;gap:12px;align-items:flex-start}
+  .modal .mh .mi{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:none}
+  .modal .mh h4{font-size:16px;font-weight:800}
+  .modal .mh p{font-size:13px;color:var(--ink-2);margin-top:3px}
+  .modal .mf{padding:14px 20px;background:var(--surface-2);display:flex;justify-content:flex-end;gap:10px;border-top:1px solid var(--line)}
+
+  /* loop diagram */
+  .loop{display:grid;grid-template-columns:repeat(4,1fr);gap:0;align-items:stretch}
+  .loop .step{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:14px;text-align:center;position:relative}
+  .loop .step .n{width:26px;height:26px;border-radius:50%;background:var(--jade);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700;margin:0 auto 8px}
+  .loop .step h5{font-size:13.5px;font-weight:700}
+  .loop .step p{font-size:11.5px;color:var(--ink-3);margin-top:3px}
+  .loop .arr{display:grid;place-items:center;color:var(--jade-soft);font-size:20px}
+
+  /* heatmap */
+  .heat{display:grid;grid-template-columns:repeat(6,1fr);gap:7px}
+  .heat .cell{border-radius:9px;padding:10px 8px;color:#fff;cursor:default;transition:.15s;border:1px solid rgba(0,0,0,.04)}
+  .heat .cell:hover{transform:translateY(-2px)}
+  .heat .cell .li{font-size:12px;font-weight:700}
+  .heat .cell .pc{font-size:16px;font-weight:800;margin-top:2px}
+  .legend{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink-3);margin-top:12px}
+  .legend .sw{width:16px;height:11px;border-radius:3px}
+
+  /* bar chart */
+  .bars{display:flex;align-items:flex-end;gap:14px;height:170px;padding-top:10px}
+  .bars .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+  .bars .bar{width:64%;background:linear-gradient(180deg,var(--jade-soft),var(--jade));border-radius:6px 6px 0 0;position:relative;min-height:4px;transition:height .6s ease}
+  .bars .bar span{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:11.5px;font-weight:700;color:var(--ink-2)}
+  .bars .lab{font-size:11.5px;color:var(--ink-3)}
+
+  /* line chart svg */
+  .linechart{width:100%;height:180px}
+
+  /* phone */
+  .phone{width:300px;background:#0E1714;border-radius:30px;padding:12px;box-shadow:0 20px 50px rgba(0,0,0,.25);margin:0 auto}
+  .phone .screen{background:#E9EDEC;border-radius:20px;overflow:hidden;min-height:440px;display:flex;flex-direction:column}
+  .phone .ph-top{background:#06C755;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700}
+  .phone .ph-top .lico{width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,.25);display:grid;place-items:center;font-weight:800}
+  .phone .body{padding:14px;flex:1;display:flex;flex-direction:column;gap:10px}
+  .bubble{background:#fff;border-radius:4px 14px 14px 14px;padding:12px 13px;font-size:12.5px;line-height:1.6;box-shadow:0 1px 2px rgba(0,0,0,.08);white-space:pre-line}
+  .bubble .h{font-weight:800;color:var(--jade);margin-bottom:4px}
+  .bubble .ln-btns{display:flex;gap:8px;margin-top:10px}
+  .bubble .ln-btns button{flex:1;border:1px solid #06C755;color:#06C755;background:#fff;border-radius:8px;padding:7px;font-size:12px;font-weight:700}
+  .scene-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .scene-tabs button{border:1px solid var(--line);background:var(--surface);padding:7px 13px;border-radius:20px;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+  .scene-tabs button.on{background:var(--jade);color:#fff;border-color:var(--jade)}
+
+  /* roadmap */
+  .road{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .road .q{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow);position:relative}
+  .road .q .qtag{font-size:11px;font-weight:800;letter-spacing:1px;color:var(--amber)}
+  .road .q h4{font-size:14px;font-weight:800;margin:4px 0 8px}
+  .road .q ul{list-style:none;font-size:12px;color:var(--ink-2)}
+  .road .q li{padding:3px 0 3px 16px;position:relative}
+  .road .q li:before{content:"";position:absolute;left:2px;top:9px;width:6px;height:6px;border-radius:50%;background:var(--jade-soft)}
+  .road .q .bv{margin-top:10px;font-size:11.5px;color:var(--jade);background:var(--jade-tint);padding:7px 9px;border-radius:8px}
+
+  .rbac-card{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .rbac-card .top{padding:16px;display:flex;align-items:center;gap:12px}
+  .rbac-card .top .em{font-size:24px}
+  .rbac-card .top h4{font-size:15px;font-weight:800}
+  .rbac-card .top span{font-size:12px;color:var(--ink-3)}
+  .rbac-card ul{list-style:none;padding:4px 16px 16px;font-size:12.5px;color:var(--ink-2)}
+  .rbac-card li{padding:5px 0 5px 18px;position:relative}
+  .rbac-card li:before{content:"✓";position:absolute;left:0;color:var(--jade-soft);font-weight:800}
+
+  .split{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
+  .list-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .list-row:last-child{border-bottom:0}
+  .list-row .ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none}
+  .list-row .tx{flex:1;min-width:0}
+  .list-row .tx b{font-size:13px;font-weight:700;display:block}
+  .list-row .tx small{color:var(--ink-3);font-size:11.5px}
+  .list-row .tm{font-size:11px;color:var(--ink-3);white-space:nowrap}
+
+  .task-empty{text-align:center;color:var(--ink-3);font-size:13px;padding:26px 10px}
+  .hr{height:1px;background:var(--line);margin:18px 0}
+  .muted{color:var(--ink-3)}
+  .pill-row{display:flex;gap:8px;flex-wrap:wrap}
+
+  @media (max-width:980px){
+    .app{grid-template-columns:1fr}
+    .sidebar{position:fixed;left:-260px;z-index:60;transition:.25s;box-shadow:0 0 40px rgba(0,0,0,.3)}
+    .sidebar.open{left:0}
+    .g4{grid-template-columns:repeat(2,1fr)} .g3,.g2{grid-template-columns:1fr}
+    .loop{grid-template-columns:1fr 1fr} .road{grid-template-columns:1fr 1fr}
+    .split{grid-template-columns:1fr} .heat{grid-template-columns:repeat(3,1fr)}
+    .menu-btn{display:inline-grid !important}
+  }
+  .menu-btn{display:none;width:38px;height:38px;border-radius:9px;border:1px solid var(--line);background:var(--surface);place-items:center}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo">
+        <div class="mark">恩</div>
+        <div>
+          <h1>社區健康學苑</h1>
+          <div class="sub">醫社一體 · 數位營運平台</div>
+        </div>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="group">營運總覽</div>
+      <button data-page="dash" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 13h8V3H3zM13 21h8V3h-8zM3 21h8v-6H3z"/></svg>總覽儀表板</button>
+      <button data-page="bi" data-min="admin">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18M7 14l4-4 3 3 5-6"/></svg>BI 決策看板<span class="lock" data-lockfor></span></button>
+
+      <div class="group">教務管理</div>
+      <button data-page="students">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-8 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg>學員資料庫</button>
+      <button data-page="courses">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2zM8 7h8M8 11h6"/></svg>課程與報名</button>
+      <button data-page="attend">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3 8-8M3 12a9 9 0 1 0 9-9"/></svg>出缺勤管理</button>
+
+      <div class="group">健康照護</div>
+      <button data-page="health">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2 5 4-12 2 7h6"/></svg>健康數據與關懷</button>
+      <button data-page="line">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>LINE 通知中心</button>
+
+      <div class="group">系統</div>
+      <button data-page="roadmap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h18M3 6h18M3 18h12"/></svg>開發藍圖</button>
+      <button data-page="rbac" data-min="super">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg>權限設定 (RBAC)<span class="lock" data-lockfor></span></button>
+    </nav>
+    <div class="side-foot">v0.9 原型 · 需求說明書 115/4/28</div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">
+        <svg viewBox="0 0 24 24" width="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <div class="crumb"><b id="crumb">總覽儀表板</b></div>
+      <div class="spacer"></div>
+      <div class="date">民國115年6月17日（週三）</div>
+      <div class="role-switch">
+        <label>目前身分</label>
+        <select id="role" onchange="setRole(this.value)">
+          <option value="super">超級管理員</option>
+          <option value="admin">行政教務管理員</option>
+          <option value="health">個案健康管理員</option>
+        </select>
+      </div>
+      <div class="avatar" id="avatar">超</div>
+    </header>
+
+    <main class="content">
+
+      <!-- ============ DASHBOARD ============ -->
+      <section class="page show" id="page-dash">
+        <div class="page-head">
+          <h2>總覽儀表板</h2>
+          <p>整合報名、出缺勤、健康檢測與關懷任務之即時營運概況。資料以身分證字號為唯一識別鍵串接。</p>
+        </div>
+        <div id="perm-dash"></div>
+
+        <div class="grid g4" style="margin-bottom:16px">
+          <div class="kpi"><div class="lab"><span class="ic ic-j">👥</span>在籍活躍學員</div><div class="val mono">1,284</div><div class="delta up">▲ 本月 +63 人</div></div>
+          <div class="kpi"><div class="lab"><span class="ic ic-b">📚</span>本期開課班數</div><div class="val mono">42</div><div class="delta up">▲ 平均報名率 88%</div></div>
+          <div class="kpi"><div class="lab"><span class="ic ic-a">⏳</span>候補待確認</div><div class="val mono">17</div><div class="delta down">▼ 5 筆即將逾時</div></div>
+          <div class="kpi"><div class="lab"><span class="ic ic-r">❤</span>待處理關懷任務</div><div class="val mono" id="kpi-task">8</div><div class="delta down">血壓異常觸發</div></div>
+        </div>
+
+        <div class="split">
+          <div class="card">
+            <div class="card-h"><h3>近期系統事件</h3><span class="tag">即時更新</span></div>
+            <div class="pad" style="padding-top:6px">
+              <div class="list-row"><div class="ic ic-r">⚠</div><div class="tx"><b>血壓異常自動觸發關懷任務</b><small>三峽區 · 秀川里 · 王陳○妹 收縮壓 162 mmHg</small></div><div class="tm">10 分鐘前</div></div>
+              <div class="list-row"><div class="ic ic-a">↻</div><div class="tx"><b>候補遞補通知已發送（LINE）</b><small>「樂齡肌力訓練 B 班」釋出 1 席 · 24H 限時</small></div><div class="tm">28 分鐘前</div></div>
+              <div class="list-row"><div class="ic ic-j">✓</div><div class="tx"><b>電子報到完成</b><small>「血壓量測與保健」上午班 報到 34 / 36</small></div><div class="tm">1 小時前</div></div>
+              <div class="list-row"><div class="ic ic-r">⨯</div><div class="tx"><b>學員標記受限名單（2 次無故未到）</b><small>待管理員執行「取消資格」釋出正取位</small></div><div class="tm">2 小時前</div></div>
+              <div class="list-row"><div class="ic ic-b">⤓</div><div class="tx"><b>紙本簽到表已匯出</b><small>鶯歌區 全班別 · Excel + PDF</small></div><div class="tm">今日 09:12</div></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>關懷閉環進度</h3><span class="tag">醫社一體</span></div>
+            <div class="pad">
+              <div class="loop">
+                <div class="step"><div class="n">1</div><h5>社區檢測</h5><p>區 / 里 / 地點<br>生理數值上傳</p></div>
+                <div class="arr">→</div>
+                <div class="step"><div class="n">2</div><h5>異常偵測</h5><p>系統自動<br>生成問安任務</p></div>
+              </div>
+              <div class="loop" style="margin-top:10px">
+                <div class="step"><div class="n">3</div><h5>電話問安</h5><p>健康管理員<br>介入並記錄</p></div>
+                <div class="arr">→</div>
+                <div class="step"><div class="n">4</div><h5>門診回流</h5><p>資料回饋<br>醫院體系</p></div>
+              </div>
+              <div class="hr"></div>
+              <div style="display:flex;justify-content:space-between;font-size:12.5px">
+                <span class="muted">本月閉環完成率</span><b style="color:var(--jade)">76%（197 / 259）</b>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ STUDENTS ============ -->
+      <section class="page" id="page-students">
+        <div class="page-head"><h2>學員資料庫</h2>
+          <p>以身分證字號為唯一識別鍵（Unique ID），串接報名紀錄、社區檢測與門診資料，並記錄活躍狀態與學習履歷。</p></div>
+        <div id="perm-students"></div>
+        <div class="searchbar">
+          <div class="sinput"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+            <input id="stu-search" placeholder="搜尋姓名、身分證字號或里別…" oninput="filterStudents()"></div>
+          <button class="btn">＋ 新增學員</button>
+          <button class="btn" data-min="admin">⤓ 匯出學習履歷</button>
+        </div>
+        <div class="card">
+          <table id="stu-table">
+            <thead><tr><th>識別鍵（身分證）</th><th>姓名</th><th>區 / 里</th><th>活躍狀態</th><th>近期收縮壓</th><th>本期報名</th><th></th></tr></thead>
+            <tbody id="stu-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ COURSES ============ -->
+      <section class="page" id="page-courses">
+        <div class="page-head"><h2>課程與報名</h2>
+          <p>含同時段衝突檢查（前後 1 分鐘判定邊界）與 24 小時候補意願確認邏輯。管理員具手動覆蓋權限。</p></div>
+        <div id="perm-courses"></div>
+
+        <div class="split">
+          <div>
+            <div class="card" style="margin-bottom:16px">
+              <div class="card-h"><h3>模擬報名（衝突檢查）</h3><span class="tag">Time Buffer Logic</span></div>
+              <div class="pad">
+                <div class="field"><label class="f">選擇學員</label>
+                  <select class="fld" id="enroll-stu">
+                    <option value="0" data-busy="週二 09:00">林○妹（已正取：週二上午 太極養生班 09:00–10:30）</option>
+                    <option value="1" data-busy="">陳○和（本期尚無正取課程）</option>
+                  </select></div>
+                <div class="field"><label class="f">選擇欲報名課程</label>
+                  <select class="fld" id="enroll-course">
+                    <option data-time="週二 09:00">血壓量測與保健 · 週二 09:00–10:00</option>
+                    <option data-time="週四 14:00">園藝療癒工作坊 · 週四 14:00–15:30</option>
+                    <option data-time="週五 10:00">智慧手機防詐課 · 週五 10:00–11:30</option>
+                  </select></div>
+                <button class="btn primary" onclick="tryEnroll()">送出報名</button>
+                <p class="muted" style="font-size:12px;margin-top:10px">提示：林○妹於週二 09:00 已有正取課程，選同時段會觸發衝突阻擋。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>候補意願確認</h3><span class="tag">24H 決策窗口</span></div>
+            <div class="pad">
+              <div style="font-size:13px;margin-bottom:6px"><b>樂齡肌力訓練 B 班</b> 釋出 1 席</div>
+              <div class="muted" style="font-size:12px;margin-bottom:12px">系統依候補序號發送 LINE，逾時自動跳下一位。</div>
+              <div style="background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:14px;text-align:center">
+                <div class="muted" style="font-size:12px">候補第 1 位 · 張○德 · 剩餘時間</div>
+                <div id="countdown" class="mono" style="font-size:30px;font-weight:800;color:var(--amber);margin:6px 0">23:59:48</div>
+                <div class="pill-row" style="justify-content:center">
+                  <button class="btn primary sm" onclick="confirmWait()">確認遞補</button>
+                  <button class="btn sm" onclick="skipWait()">放棄 / 跳下一位</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-h"><h3>本期課程一覽</h3><span class="tag">42 班</span></div>
+          <table>
+            <thead><tr><th>課程名稱</th><th>時間</th><th>地點（里）</th><th>正取 / 上限</th><th>候補</th><th>狀態</th></tr></thead>
+            <tbody>
+              <tr><td>太極養生班</td><td class="mono">週二 09:00–10:30</td><td>三峽區 · 秀川里</td><td class="mono">30 / 30</td><td class="mono">6</td><td><span class="badge b-red"><span class="dot" style="background:var(--red)"></span>額滿候補中</span></td></tr>
+              <tr><td>血壓量測與保健</td><td class="mono">週二 09:00–10:00</td><td>三峽區 · 三峽里</td><td class="mono">22 / 36</td><td class="mono">0</td><td><span class="badge b-green"><span class="dot" style="background:var(--jade-soft)"></span>開放報名</span></td></tr>
+              <tr><td>園藝療癒工作坊</td><td class="mono">週四 14:00–15:30</td><td>鶯歌區 · 鳳鳴里</td><td class="mono">18 / 24</td><td class="mono">0</td><td><span class="badge b-green"><span class="dot" style="background:var(--jade-soft)"></span>開放報名</span></td></tr>
+              <tr><td>樂齡肌力訓練 B 班</td><td class="mono">週三 10:00–11:00</td><td>土城區 · 清水里</td><td class="mono">19 / 20</td><td class="mono">3</td><td><span class="badge b-amber"><span class="dot" style="background:var(--amber)"></span>釋出 1 席</span></td></tr>
+              <tr><td>智慧手機防詐課</td><td class="mono">週五 10:00–11:30</td><td>三峽區 · 龍埔里</td><td class="mono">12 / 30</td><td class="mono">0</td><td><span class="badge b-green"><span class="dot" style="background:var(--jade-soft)"></span>開放報名</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ ATTENDANCE ============ -->
+      <section class="page" id="page-attend">
+        <div class="page-head"><h2>出缺勤管理</h2>
+          <p>電子報到掃碼自動回報後臺。無故未到累計 2 次自動標記「受限名單」，由管理員執行取消資格並釋出正取位。</p></div>
+        <div id="perm-attend"></div>
+        <div class="card">
+          <div class="card-h"><h3>太極養生班 · 週二 09:00（民國115/6/16）</h3>
+            <button class="btn sm primary" onclick="scanIn()">📷 模擬掃碼報到</button></div>
+          <table>
+            <thead><tr><th>姓名</th><th>里</th><th>本次狀態</th><th>無故未到累計</th><th>操作</th></tr></thead>
+            <tbody id="att-body"></tbody>
+          </table>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-h"><h3>受限名單（待取消資格）</h3><span class="tag">2-Strike Rule</span></div>
+          <div class="pad"><div id="restricted" class="task-empty">目前無達 2 次無故未到之學員。在上方對同一學員標記兩次「無故未到」即可觸發。</div></div>
+        </div>
+      </section>
+
+      <!-- ============ HEALTH ============ -->
+      <section class="page" id="page-health">
+        <div class="page-head"><h2>健康數據與關懷</h2>
+          <p>生理數值錄入後，若收縮壓 &gt; 140 mmHg，系統自動於後臺生成「電話問安任務」，完成數據檢測到人工介入的追蹤閉環。</p></div>
+        <div id="perm-health"></div>
+        <div class="split">
+          <div class="card">
+            <div class="card-h"><h3>社區檢測現場錄入</h3><span class="tag">三級地點架構</span></div>
+            <div class="pad">
+              <div class="grid g2" style="gap:12px">
+                <div class="field"><label class="f">區</label><select class="fld" id="h-dist"><option>三峽區</option><option>鶯歌區</option><option>土城區</option></select></div>
+                <div class="field"><label class="f">里</label><select class="fld" id="h-vil"><option>秀川里</option><option>三峽里</option><option>龍埔里</option><option>鳳鳴里</option></select></div>
+              </div>
+              <div class="field"><label class="f">學員</label><select class="fld" id="h-stu"><option>王陳○妹（A12345****）</option><option>李○國（B22233****）</option><option>周○蘭（F18877****）</option></select></div>
+              <div class="grid g2" style="gap:12px">
+                <div class="field"><label class="f">收縮壓 SBP（mmHg）</label><input id="h-sbp" type="number" value="138" class="mono"></div>
+                <div class="field"><label class="f">舒張壓 DBP（mmHg）</label><input id="h-dbp" type="number" value="86" class="mono"></div>
+              </div>
+              <button class="btn primary" onclick="submitHealth()">儲存檢測數值</button>
+              <p class="muted" style="font-size:12px;margin-top:10px">把收縮壓改成 &gt; 140 再儲存，會自動產生右側關懷任務。</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>自動產生 · 電話問安任務</h3><span class="tag" id="task-count">0 筆</span></div>
+            <div class="pad"><div id="task-list"><div class="task-empty">尚無異常觸發任務。</div></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ BI ============ -->
+      <section class="page" id="page-bi">
+        <div class="page-head"><h2>BI 決策分析看板</h2>
+          <p>將碎片化的區 / 里 / 地點檢測資料轉化為健康熱點地圖與流失預警，作為課程規劃與醫療資源投放之依據。</p></div>
+        <div id="perm-bi"></div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-h"><h3>社區健康熱點地圖 · 各里三高（高血壓）盛行率</h3><span class="tag">階層式分佈</span></div>
+          <div class="pad">
+            <div class="heat" id="heatmap"></div>
+            <div class="legend"><span>低</span>
+              <span class="sw" style="background:#CFE6DD"></span><span class="sw" style="background:#85C2AC"></span>
+              <span class="sw" style="background:#E2B675"></span><span class="sw" style="background:#D08A55"></span>
+              <span class="sw" style="background:#BC4534"></span><span>高</span>
+              <span style="margin-left:auto;color:var(--jade)">建議：龍埔里異常率偏高 → 加開「心血管健康保健」專題</span>
+            </div>
+          </div>
+        </div>
+        <div class="split">
+          <div class="card">
+            <div class="card-h"><h3>各課程類別參與人次</h3><span class="tag">本期累計</span></div>
+            <div class="pad"><div class="bars">
+              <div class="col"><div class="bar" style="height:80%"><span>412</span></div><div class="lab">健康保健</div></div>
+              <div class="col"><div class="bar" style="height:62%"><span>318</span></div><div class="lab">樂齡運動</div></div>
+              <div class="col"><div class="bar" style="height:45%"><span>231</span></div><div class="lab">園藝療癒</div></div>
+              <div class="col"><div class="bar" style="height:38%"><span>196</span></div><div class="lab">數位防詐</div></div>
+              <div class="col"><div class="bar" style="height:28%"><span>142</span></div><div class="lab">共餐關懷</div></div>
+            </div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>學員活躍度趨勢 · 流失預警</h3><span class="tag">近 6 個月</span></div>
+            <div class="pad">
+              <svg class="linechart" viewBox="0 0 320 180" preserveAspectRatio="none">
+                <polyline fill="none" stroke="#1F5C4D" stroke-width="2.5" points="10,40 65,55 120,48 175,70 230,95 295,120"/>
+                <polyline fill="rgba(31,92,77,.08)" stroke="none" points="10,40 65,55 120,48 175,70 230,95 295,120 295,170 10,170"/>
+                <g fill="#1F5C4D"><circle cx="10" cy="40" r="3"/><circle cx="65" cy="55" r="3"/><circle cx="120" cy="48" r="3"/><circle cx="175" cy="70" r="3"/><circle cx="230" cy="95" r="3"/><circle cx="295" cy="120" r="3"/></g>
+              </svg>
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3)"><span>1月</span><span>2月</span><span>3月</span><span>4月</span><span>5月</span><span>6月</span></div>
+              <div class="hr"></div>
+              <div style="font-size:12.5px;color:var(--red)">⚠ 27 名學員連續一個月未出席 → 建議發布「久違關懷」LINE 通知</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ LINE ============ -->
+      <section class="page" id="page-line">
+        <div class="page-head"><h2>LINE 通知中心</h2>
+          <p>課程提醒、遞補確認、出缺勤異常與健康關懷之推送文案預覽。實際串接 LINE Messaging API。</p></div>
+        <div id="perm-line"></div>
+        <div class="scene-tabs" id="scene-tabs">
+          <button class="on" onclick="setScene(0,this)">報名成功確認</button>
+          <button onclick="setScene(1,this)">候補遞補（24H）</button>
+          <button onclick="setScene(2,this)">出缺勤異常警告</button>
+          <button onclick="setScene(3,this)">健康異常關懷</button>
+        </div>
+        <div class="phone">
+          <div class="screen">
+            <div class="ph-top"><div class="lico">恩</div>恩主公社區健康學苑</div>
+            <div class="body" id="ln-body"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ROADMAP ============ -->
+      <section class="page" id="page-roadmap">
+        <div class="page-head"><h2>一年期開發藍圖</h2>
+          <p>分四季由基礎數據建設、核心功能、服務自動化推進至決策智慧化。</p></div>
+        <div class="road">
+          <div class="q"><div class="qtag">Q1 · P1</div><h4>基礎數據建設期</h4>
+            <ul><li>學員基礎資料庫</li><li>生理 / 社區檢測上傳（區里地點三級）</li><li>報名同時段衝突檢查</li></ul>
+            <div class="bv">建立數據底座，解決社區檢測碎片化</div></div>
+          <div class="q"><div class="qtag">Q2 · P2</div><h4>核心功能開發期</h4>
+            <ul><li>課程報名系統</li><li>候補意願確認（來不來 Check）</li><li>班級管理 · 問心書院連結</li></ul>
+            <div class="bv">流程標準化，整合外部資源</div></div>
+          <div class="q"><div class="qtag">Q3 · P2</div><h4>服務自動化期</h4>
+            <ul><li>電子報到與出缺勤</li><li>LINE 整合通知</li><li>師資與影音資料庫</li></ul>
+            <div class="bv">營運自動化，降低現場人力負擔</div></div>
+          <div class="q"><div class="qtag">Q4 · P3</div><h4>決策智慧化期</h4>
+            <ul><li>BI 分析看板（熱點 / 流失）</li><li>醫院門診資料串接</li><li>個人行事曆同步</li></ul>
+            <div class="bv">實現預防醫學，資料回流醫院</div></div>
+        </div>
+
+        <div class="card" style="margin-top:20px">
+          <div class="card-h"><h3>介面分工：PC 版 vs 手機版</h3></div>
+          <table>
+            <thead><tr><th>功能類別</th><th>電腦版（PC）</th><th>手機版（Mobile）</th></tr></thead>
+            <tbody>
+              <tr><td><b>行政 / 教務</b></td><td>課程建立、師資庫、簽到表匯出</td><td>查看班級名單、即時請假</td></tr>
+              <tr><td><b>現場作業</b></td><td>批量匯入、健康報告匯出、BI 看板</td><td>生理數值錄入、報到掃碼、問安紀錄</td></tr>
+              <tr><td><b>互動 / 工具</b></td><td>影音上傳、滿意度問卷設計</td><td>LINE 推送預覽、行事曆同步</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ RBAC ============ -->
+      <section class="page" id="page-rbac">
+        <div class="page-head"><h2>多層級權限設計（RBAC）</h2>
+          <p>依組織架構定義三類角色，落實最小權限原則。可用右上角「目前身分」切換，觀察左側選單與頁面權限變化。</p></div>
+        <div class="grid g3">
+          <div class="rbac-card">
+            <div class="top" style="background:var(--jade-tint)"><span class="em">👑</span><div><h4>超級管理員</h4><span>Super Admin</span></div></div>
+            <ul><li>系統全域設定</li><li>最高級別 BI 數據檢視</li><li>管理員帳號分配與日誌查閱</li><li>跨區大數據決策支持</li></ul>
+          </div>
+          <div class="rbac-card">
+            <div class="top" style="background:var(--blue-tint)"><span class="em">🗂️</span><div><h4>行政教務管理員</h4><span>Admin</span></div></div>
+            <ul><li>課程建立、師資管理</li><li>手動調整候補名單</li><li>一鍵匯出紙本簽到表</li><li>維護學員學習履歷</li></ul>
+          </div>
+          <div class="rbac-card">
+            <div class="top" style="background:var(--amber-tint)"><span class="em">🩺</span><div><h4>個案健康管理員</h4><span>Health Manager</span></div></div>
+            <ul><li>僅檢視負責區域 / 里學員</li><li>生理數值錄入</li><li>電話問安紀錄輸入</li><li>個案健康趨勢檢視</li></ul>
+          </div>
+        </div>
+        <div class="card" style="margin-top:18px">
+          <div class="card-h"><h3>功能存取對照表</h3></div>
+          <table>
+            <thead><tr><th>功能</th><th>超級管理員</th><th>教務管理員</th><th>健康管理員</th></tr></thead>
+            <tbody>
+              <tr><td>BI 全域看板</td><td><span class="badge b-green">完整</span></td><td><span class="badge b-amber">限本區</span></td><td><span class="badge b-grey">無</span></td></tr>
+              <tr><td>課程 / 師資管理</td><td><span class="badge b-green">可</span></td><td><span class="badge b-green">可</span></td><td><span class="badge b-grey">無</span></td></tr>
+              <tr><td>候補手動調整</td><td><span class="badge b-green">可</span></td><td><span class="badge b-green">可</span></td><td><span class="badge b-grey">無</span></td></tr>
+              <tr><td>生理數值 / 問安錄入</td><td><span class="badge b-green">可</span></td><td><span class="badge b-blue">檢視</span></td><td><span class="badge b-green">可（限轄區）</span></td></tr>
+              <tr><td>帳號分配 / 系統日誌</td><td><span class="badge b-green">可</span></td><td><span class="badge b-grey">無</span></td><td><span class="badge b-grey">無</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-bg"><div class="modal" id="modal"></div></div>
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+/* ---------- Navigation ---------- */
+const crumbMap={dash:'總覽儀表板',bi:'BI 決策看板',students:'學員資料庫',courses:'課程與報名',
+  attend:'出缺勤管理',health:'健康數據與關懷',line:'LINE 通知中心',roadmap:'開發藍圖',rbac:'權限設定（RBAC）'};
+document.querySelectorAll('#nav button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    if(b.disabled)return;
+    document.querySelectorAll('#nav button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    const p=b.dataset.page;
+    document.querySelectorAll('.page').forEach(s=>s.classList.remove('show'));
+    document.getElementById('page-'+p).classList.add('show');
+    document.getElementById('crumb').textContent=crumbMap[p];
+    document.getElementById('sidebar').classList.remove('open');
+    window.scrollTo(0,0);
+  });
+});
+
+/* ---------- Roles / RBAC ---------- */
+const roleRank={super:3,admin:2,health:1};
+const roleName={super:'超級管理員',admin:'行政教務管理員',health:'個案健康管理員'};
+const roleAvatar={super:'超',admin:'教',health:'健'};
+function setRole(r){
+  const rank=roleRank[r];
+  document.getElementById('avatar').textContent=roleAvatar[r];
+  // toggle nav items by data-min
+  document.querySelectorAll('[data-min]').forEach(el=>{
+    const need=el.dataset.min; const ok=rank>=roleRank[need];
+    if(el.tagName==='BUTTON' && el.parentElement.id==='nav'){
+      el.disabled=!ok;
+      const lk=el.querySelector('[data-lockfor]'); if(lk) lk.textContent=ok?'':'🔒';
+      if(!ok && el.classList.contains('active')){ document.querySelector('#nav button[data-page="dash"]').click(); }
+    }
+  });
+  // hide admin-only buttons in pages for health manager
+  document.querySelectorAll('button[data-min="admin"]').forEach(b=>{
+    if(b.parentElement.id!=='nav') b.style.display = rank>=2?'':'none';
+  });
+  // permission banners
+  const scope={
+    super:'目前為 <b>超級管理員</b>：可存取全系統設定、全域 BI 與帳號管理。',
+    admin:'目前為 <b>行政教務管理員</b>：可管理課程、候補與簽到表，BI 僅限本區。',
+    health:'目前為 <b>個案健康管理員</b>：僅能檢視負責「區 / 里」學員，無課程與系統管理權限。'
+  }[r];
+  document.querySelectorAll('[id^="perm-"]').forEach(el=>{
+    el.innerHTML='<div class="perm-banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg><span>'+scope+'</span></div>';
+  });
+}
+
+/* ---------- Toast & Modal ---------- */
+function toast(msg,type){
+  const t=document.createElement('div'); t.className='toast '+(type||'');
+  t.innerHTML=(type==='warn'?'⚠ ':type==='ok'?'✓ ':'')+msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='.3s';setTimeout(()=>t.remove(),300);},3600);
+}
+function showModal(html){document.getElementById('modal').innerHTML=html;document.getElementById('modal-bg').classList.add('show');}
+function closeModal(){document.getElementById('modal-bg').classList.remove('show');}
+document.getElementById('modal-bg').addEventListener('click',e=>{if(e.target.id==='modal-bg')closeModal();});
+
+/* ---------- Students ---------- */
+const students=[
+  ['A123456789','王陳○妹','三峽區 · 秀川里','active',162,3],
+  ['B223334445','李○國','鶯歌區 · 鳳鳴里','active',128,2],
+  ['F188776655','周○蘭','三峽區 · 三峽里','rest',135,1],
+  ['A111223344','林○妹','三峽區 · 龍埔里','active',141,4],
+  ['C334455667','陳○和','土城區 · 清水里','inactive',119,0],
+  ['D445566778','黃○珠','三峽區 · 秀川里','active',155,2],
+  ['E556677889','吳○發','鶯歌區 · 鳳鳴里','active',124,1],
+];
+function statusBadge(s){
+  if(s==='active')return '<span class="badge b-green"><span class="dot" style="background:var(--jade-soft)"></span>活躍</span>';
+  if(s==='inactive')return '<span class="badge b-grey"><span class="dot" style="background:#9aa5a0"></span>未活躍</span>';
+  return '<span class="badge b-red"><span class="dot" style="background:var(--red)"></span>受限名單</span>';
+}
+function sbpBadge(v){const c=v>140?'b-red':v>=130?'b-amber':'b-green';return '<span class="badge '+c+' mono">'+v+'</span>';}
+function renderStudents(list){
+  document.getElementById('stu-body').innerHTML=list.map(s=>
+    '<tr><td class="mono muted">'+s[0]+'</td><td><b>'+s[1]+'</b></td><td>'+s[2]+'</td><td>'+statusBadge(s[3])+'</td><td>'+sbpBadge(s[4])+' <small class="muted">mmHg</small></td><td class="mono">'+s[5]+' 班</td><td><button class="btn ghost sm">履歷</button></td></tr>').join('');
+}
+function filterStudents(){
+  const q=document.getElementById('stu-search').value.trim();
+  renderStudents(q?students.filter(s=>s[1].includes(q)||s[0].includes(q)||s[2].includes(q)):students);
+}
+renderStudents(students);
+
+/* ---------- Enroll conflict check ---------- */
+function tryEnroll(){
+  const stu=document.getElementById('enroll-stu');
+  const busy=stu.selectedOptions[0].dataset.busy;
+  const c=document.getElementById('enroll-course');
+  const time=c.selectedOptions[0].dataset.time;
+  if(busy && busy===time){
+    showModal('<div class="mh"><div class="mi" style="background:var(--red-tint)">⚠</div><div><h4>課程時間衝突</h4><p>該學員於 <b>'+time+'</b> 已有其他正取課程，依 Time Buffer 邏輯（前後 1 分鐘判定）禁止重複報名。</p></div></div><div class="mf"><button class="btn" onclick="closeModal()">取消</button><button class="btn amber" onclick="closeModal();toast(\'已記錄管理員手動覆蓋\',\'warn\')">管理員手動覆蓋</button></div>');
+  }else{
+    toast('報名成功，已加入正取名單','ok');
+  }
+}
+
+/* ---------- Waitlist countdown ---------- */
+let secs=23*3600+59*60+48, timer;
+function fmt(s){const h=String(Math.floor(s/3600)).padStart(2,'0');const m=String(Math.floor(s%3600/60)).padStart(2,'0');const x=String(s%60).padStart(2,'0');return h+':'+m+':'+x;}
+function tick(){const el=document.getElementById('countdown');if(!el)return;if(secs>0){secs--;el.textContent=fmt(secs);}else{el.textContent='00:00:00';toast('候補逾時，自動跳下一位','warn');clearInterval(timer);}}
+timer=setInterval(tick,1000);
+function confirmWait(){toast('張○德 已確認遞補，轉為正取','ok');clearInterval(timer);document.getElementById('countdown').textContent='已確認';document.getElementById('countdown').style.color='var(--jade)';}
+function skipWait(){toast('已跳至候補第 2 位，重新發送 LINE','warn');secs=24*3600;}
+
+/* ---------- Attendance 2-strike ---------- */
+const att=[
+  {n:'王陳○妹',v:'秀川里',s:'in',miss:0},
+  {n:'李○國',v:'鳳鳴里',s:'in',miss:1},
+  {n:'林○妹',v:'龍埔里',s:'pending',miss:1},
+  {n:'黃○珠',v:'秀川里',s:'pending',miss:0},
+  {n:'吳○發',v:'鳳鳴里',s:'pending',miss:0},
+];
+function renderAtt(){
+  document.getElementById('att-body').innerHTML=att.map((a,i)=>{
+    let st = a.s==='in'?'<span class="badge b-green">已報到</span>': a.s==='absent'?'<span class="badge b-red">無故未到</span>':'<span class="badge b-grey">未報到</span>';
+    let act = a.s==='in'?'<span class="muted">—</span>':
+      '<button class="btn sm" onclick="markIn('+i+')">補報到</button> <button class="btn sm" onclick="markAbsent('+i+')">標記未到</button>';
+    return '<tr><td><b>'+a.n+'</b></td><td>'+a.v+'</td><td>'+st+'</td><td class="mono">'+a.miss+' 次</td><td>'+act+'</td></tr>';
+  }).join('');
+  // restricted list
+  const r=att.filter(a=>a.miss>=2);
+  const box=document.getElementById('restricted');
+  if(r.length===0){box.className='task-empty';box.innerHTML='目前無達 2 次無故未到之學員。在上方對同一學員標記兩次「無故未到」即可觸發。';}
+  else{box.className='';box.innerHTML=r.map(a=>
+    '<div class="list-row"><div class="ic ic-r">⨯</div><div class="tx"><b>'+a.n+'　<span class="badge b-red">受限名單</span></b><small>無故未到累計 '+a.miss+' 次 · 取消資格後將釋出正取位由候補遞補</small></div><button class="btn amber sm" onclick="toast(\''+a.n+' 已取消資格，正取位釋出候補遞補\',\'warn\')">取消資格</button></div>').join('');}
+}
+function markIn(i){att[i].s='in';renderAtt();toast(att[i].n+' 已報到','ok');}
+function markAbsent(i){att[i].s='absent';att[i].miss++;renderAtt();
+  if(att[i].miss>=2)toast(att[i].n+' 累計 2 次無故未到，自動標記受限名單','warn');else toast('已標記無故未到（累計 '+att[i].miss+' 次）','warn');}
+function scanIn(){const p=att.findIndex(a=>a.s==='pending');if(p<0){toast('全員已報到','ok');return;}att[p].s='in';renderAtt();toast('📷 掃碼成功：'+att[p].n+' 報到','ok');}
+renderAtt();
+
+/* ---------- Health close-the-loop ---------- */
+let tasks=[];
+function submitHealth(){
+  const sbp=parseInt(document.getElementById('h-sbp').value||0);
+  const dbp=document.getElementById('h-dbp').value;
+  const stu=document.getElementById('h-stu').value.split('（')[0];
+  const loc=document.getElementById('h-dist').value+' · '+document.getElementById('h-vil').value;
+  if(sbp>140){
+    tasks.unshift({stu,sbp,loc,t:'剛剛'});
+    renderTasks();
+    toast('收縮壓 '+sbp+' mmHg 異常 → 已生成電話問安任務','warn');
+  }else{
+    toast('檢測數值已儲存（收縮壓 '+sbp+' / 舒張壓 '+dbp+'）','ok');
+  }
+}
+function renderTasks(){
+  document.getElementById('task-count').textContent=tasks.length+' 筆';
+  document.getElementById('kpi-task').textContent=8+tasks.length;
+  const box=document.getElementById('task-list');
+  if(tasks.length===0){box.innerHTML='<div class="task-empty">尚無異常觸發任務。</div>';return;}
+  box.innerHTML=tasks.map((t,i)=>
+    '<div class="list-row"><div class="ic ic-r">❤</div><div class="tx"><b>'+t.stu+'　<span class="badge b-red mono">SBP '+t.sbp+'</span></b><small>'+t.loc+' · 待健康管理員電話問安</small></div><button class="btn sm" onclick="closeTask('+i+')">完成問安</button></div>').join('');
+}
+function closeTask(i){const t=tasks[i];tasks.splice(i,1);renderTasks();toast('已記錄 '+t.stu+' 問安紀錄，閉環完成','ok');}
+
+/* ---------- LINE scenes ---------- */
+const scenes=[
+  {h:'課程報名成功確認',body:'親愛的 林○妹 您好，\n您已成功報名「血壓量測與保健」。\n\n📍 地點：三峽區 · 三峽里活動中心\n⏰ 時間：6/24（二）09:00–10:00\n📅 可點擊下方連結一鍵同步至手機行事曆。',btns:['加入行事曆']},
+  {h:'候補遞補意願確認',body:'親愛的學員，\n您候補的「樂齡肌力訓練 B 班」已有空缺。\n\n請於 24 小時內 回覆是否參加？\n逾時將視同放棄並轉由下一位候補。',btns:['我要參加','放棄本次遞補']},
+  {h:'重要權益提醒',body:'系統紀錄您於 6/16 之課程無故未到。\n\n提醒您：依學苑規範，累計 2 次無故未到 將自動釋出該課程資格並影響後續報名。\n如需請假請於前一日透過系統操作。',btns:['前往請假']},
+  {h:'恩主公健康管家',body:'我們注意到您在 秀川里 測得的血壓數值稍高（162 mmHg）。\n\n建議近日注意飲食並多喝水。\n健康管理員將於近期電話關懷，或可預約本院門診諮詢。',btns:['預約門診諮詢']},
+];
+function setScene(i,btn){
+  document.querySelectorAll('#scene-tabs button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  const s=scenes[i];
+  document.getElementById('ln-body').innerHTML=
+    '<div class="bubble"><div class="h">【'+s.h+'】</div>'+s.body+
+    '<div class="ln-btns">'+s.btns.map(b=>'<button>'+b+'</button>').join('')+'</div></div>';
+}
+setScene(0,document.querySelector('#scene-tabs button'));
+
+/* ---------- Heatmap ---------- */
+const villages=[
+  ['秀川里',9],['三峽里',14],['龍埔里',31],['鳳鳴里',22],['清水里',7],['介壽里',18],
+  ['永館里',11],['礁溪里',26],['嘉添里',5],['安溪里',16],['鳶山里',12],['大同里',28],
+];
+function heatColor(v){
+  if(v<8)return '#CFE6DD';if(v<13)return '#85C2AC';if(v<18)return '#E2B675';
+  if(v<24)return '#D08A55';return '#BC4534';}
+document.getElementById('heatmap').innerHTML=villages.map(v=>
+  '<div class="cell" style="background:'+heatColor(v[1])+'" title="'+v[0]+' 高血壓盛行率 '+v[1]+'%"><div class="li">'+v[0]+'</div><div class="pc">'+v[1]+'%</div></div>').join('');
+
+/* init */
+setRole('super');
+</script>
+</body>
+</html>
