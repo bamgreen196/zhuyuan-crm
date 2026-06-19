@@ -740,12 +740,30 @@ function adjustProductQty(cat, name, price, delta) {
     openCustomPrice(cat, name);
     return;
   }
+  // 單支分類：尚未加入購物車時按+，直接輸入數量（避免大量點擊）
+  if (cat === '單支' && delta > 0 && !cart[key]) {
+    openQtyInput(cat, name, price);
+    return;
+  }
   if (!cart[key] && delta > 0) {
     cart[key] = { name, price, qty: 0, category: cat };
   }
   if (!cart[key]) return;
   cart[key].qty += delta;
   if (cart[key].qty <= 0) delete cart[key];
+  renderProductGrid();
+  updateBottomBar();
+}
+
+// ── 單支分類：直接輸入數量 ──
+function openQtyInput(cat, name, price) {
+  const qty = prompt('請輸入「' + name + '」數量：', '1');
+  if (qty === null) return;
+  const n = parseInt(qty);
+  if (!n || n <= 0) { alert('請輸入有效數量'); return; }
+  const key = cat + '|' + name;
+  if (!cart[key]) cart[key] = { name, price, qty: 0, category: cat };
+  cart[key].qty += n;
   renderProductGrid();
   updateBottomBar();
 }
