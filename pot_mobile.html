@@ -380,6 +380,7 @@ function renderStock(items) {
     '<div class="si-name">' + i.name + ' <span style="font-size:15px;color:#888">/ ' + i.color + '</span>' +
     (i.isLow ? '<span class="low-badge">不足</span>' : '') + '</div>' +
     '<div class="si-sub">廠商：' + (i.vendor || '—') + '　貨號：' + (i.vendorCode || '—') + '　$' + (i.price || 0) + '</div>' +
+    ((i.length || i.width || i.height) ? '<div class="si-sub">尺寸：' + (i.length||'—') + ' × ' + (i.width||'—') + ' × ' + (i.height||'—') + ' cm</div>' : '') +
     '</div>' +
     '<div>' +
     '<div class="si-num">' + i.stock + '</div>' +
