@@ -538,6 +538,16 @@ function switchScreen(s) {
   document.getElementById('screen-' + s).style.display = 'block';
   document.getElementById('nav-' + s).classList.add('active');
 
+  // 從補印模式切到開單，重置整個流程
+  if (s === 'order' && isReprintMode) {
+    isReprintMode = false;
+    savedOrder = null;
+    cart = {};
+    currentCustomer = null;
+    goToStep(0);
+    renderCustomers();
+  }
+
   const bb = document.getElementById('bottom-bar');
   if (s === 'order') {
     bb.style.display = 'block';
