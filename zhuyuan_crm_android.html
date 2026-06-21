@@ -317,7 +317,7 @@ body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Noto
 
   <!-- Bottom Nav -->
   <div class="bottom-nav">
-    <button class="nav-item active" id="nav-order" onclick="switchScreen('order')">
+    <button class="nav-item active" id="nav-order" onclick="goToOrderTab()">
       <span class="nav-icon">🧾</span>開單
     </button>
     <button class="nav-item" id="nav-history" onclick="switchScreen('history')">
@@ -538,16 +538,6 @@ function switchScreen(s) {
   document.getElementById('screen-' + s).style.display = 'block';
   document.getElementById('nav-' + s).classList.add('active');
 
-  // 從補印模式切到開單，重置整個流程
-  if (s === 'order' && isReprintMode) {
-    isReprintMode = false;
-    savedOrder = null;
-    cart = {};
-    currentCustomer = null;
-    goToStep(0);
-    renderCustomers();
-  }
-
   const bb = document.getElementById('bottom-bar');
   if (s === 'order') {
     bb.style.display = 'block';
@@ -557,6 +547,21 @@ function switchScreen(s) {
   }
 
   if (s === 'history') renderHistory();
+}
+
+// 點底部「開單」分頁：若在補印模式，重置回正常開單流程
+function goToOrderTab() {
+  if (isReprintMode) {
+    isReprintMode = false;
+    savedOrder = null;
+    cart = {};
+    currentCustomer = null;
+    switchScreen('order');
+    goToStep(0);
+    renderCustomers();
+  } else {
+    switchScreen('order');
+  }
 }
 
 // ── Customers ──
