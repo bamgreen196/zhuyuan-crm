@@ -205,6 +205,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
         <label>型號名稱</label>
         <input type="text" id="costModelName" placeholder="例：308、508大紅…">
       </div>
+      <div class="form-group">
+        <label>備註（選填）</label>
+        <input type="text" id="costModelNote" placeholder="例：適用場合、特殊說明...">
+      </div>
     </div>
 
     <div class="card">
@@ -380,7 +384,6 @@ function renderStock(items) {
     '<div class="si-name">' + i.name + ' <span style="font-size:15px;color:#888">/ ' + i.color + '</span>' +
     (i.isLow ? '<span class="low-badge">不足</span>' : '') + '</div>' +
     '<div class="si-sub">廠商：' + (i.vendor || '—') + '　貨號：' + (i.vendorCode || '—') + '　$' + (i.price || 0) + '</div>' +
-    ((i.length || i.width || i.height) ? '<div class="si-sub">尺寸：' + (i.length||'—') + '（寬）× ' + (i.width||'—') + '（深）× ' + (i.height||'—') + '（高）cm</div>' : '') +
     '</div>' +
     '<div>' +
     '<div class="si-num">' + i.stock + '</div>' +
@@ -492,7 +495,8 @@ async function saveCostModel() {
   }).filter(Boolean);
   const total = bamboo.reduce((s,b)=>s+b.qty*b.price,0) + potPrice + accData.reduce((s,a)=>s+a.qty*a.price,0);
   try {
-    const res = await apiPost('saveCostModel', { data: { name, bamboo, potName, potPrice, accData, total } });
+    const note = (document.getElementById('costModelNote') ? document.getElementById('costModelNote').value.trim() : '');
+    const res = await apiPost('saveCostModel', { data: { name, bamboo, potName, potPrice, accData, total, note } });
     if (!res.success) throw new Error(res.error);
     alert('✅ 型號「' + name + '」已' + (res.isNew ? '新增' : '更新') + '儲存');
     await loadCostModels();
@@ -521,7 +525,7 @@ function renderCostModelList(models) {
       '<div style="flex:1;min-width:0;">' +
       '<div class="m-name">' + m.name + '</div>' +
       '<div style="margin:6px 0;">' + tags + potTag + accTags + '</div>' +
-      '<div class="m-sub">' + m.updatedAt + '</div>' +
+      '<div class="m-sub">' + m.updatedAt + (m.note ? ' ｜ ' + m.note : '') + '</div>' +
       '</div>' +
       '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-left:12px;flex-shrink:0;">' +
       '<div class="m-cost">$' + (m.total % 1 === 0 ? m.total : m.total.toFixed(2)) + '</div>' +
@@ -536,6 +540,7 @@ async function loadCostModel(i) {
     if (!res.success || !res.models || !res.models[i]) return;
     const m = res.models[i];
     document.getElementById('costModelName').value = m.name;
+    if (document.getElementById('costModelNote')) document.getElementById('costModelNote').value = m.note || '';
     bambooSizes.forEach((_, j) => { const el = document.getElementById('cb' + j); if (el) el.value = ''; });
     (m.bamboo || []).forEach(b => {
       const idx = bambooSizes.findIndex(s => s.name === b.name);
