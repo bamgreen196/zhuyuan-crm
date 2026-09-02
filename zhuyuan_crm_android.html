@@ -127,6 +127,13 @@ body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Noto
 .history-date { font-size: 12px; color: var(--ink3); margin-bottom: 4px; }
 .history-detail { font-size: 13px; color: var(--ink2); margin-bottom: 6px; line-height: 1.6; }
 .history-amount { font-size: 15px; font-weight: 700; color: var(--green); }
+.date-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.date-preset { min-height: 44px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 22px; background: var(--surface); color: var(--ink2); font-size: 14px; cursor: pointer; }
+.date-preset[aria-pressed="true"] { background: var(--green); color: white; border-color: var(--green); }
+.date-fields { display: flex; gap: 10px; margin-top: 10px; }
+.date-fields label { flex: 1; min-width: 0; font-size: 12px; color: var(--ink3); }
+.date-fields input { display: block; width: 100%; min-width: 0; min-height: 44px; margin-top: 5px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; background: var(--surface); color: var(--ink); }
+.date-summary { margin-top: 10px; font-size: 13px; color: var(--ink2); }
 
 /* ── Settings ── */
 .settings-field { margin-bottom: 14px; }
@@ -250,19 +257,31 @@ body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Noto
         <div style="padding:0 16px 12px;display:flex;flex-direction:column;gap:10px;">
           <div>
             <div style="font-size:12px;color:var(--ink3);margin-bottom:5px;">客戶</div>
-            <select id="search-customer" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:var(--surface);color:var(--ink);">
+            <select id="search-customer" aria-label="客戶" onchange="updateHistoryDateSummary()" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:16px;background:var(--surface);color:var(--ink);">
               <option value="">全部客戶</option>
             </select>
           </div>
           <div>
             <div style="font-size:12px;color:var(--ink3);margin-bottom:5px;">日期</div>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <input type="date" id="search-date-from" style="flex:1;padding:10px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--ink);" />
-              <span style="color:var(--ink3);font-size:13px;">到</span>
-              <input type="date" id="search-date-to" style="flex:1;padding:10px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--ink);" />
+            <div class="date-presets" role="group" aria-label="查詢時段">
+              <button type="button" class="date-preset" data-period="today" aria-pressed="false" onclick="setHistoryPeriod('today')">今天</button>
+              <button type="button" class="date-preset" data-period="week" aria-pressed="false" onclick="setHistoryPeriod('week')">近 7 天</button>
+              <button type="button" class="date-preset" data-period="thisMonth" aria-pressed="false" onclick="setHistoryPeriod('thisMonth')">本月</button>
+              <button type="button" class="date-preset" data-period="lastMonth" aria-pressed="false" onclick="setHistoryPeriod('lastMonth')">上月</button>
+              <button type="button" class="date-preset" data-period="all" aria-pressed="true" onclick="setHistoryPeriod('all')">全部</button>
+              <button type="button" class="date-preset" data-period="month" aria-pressed="false" onclick="setHistoryPeriod('month')">指定月份</button>
+              <button type="button" class="date-preset" data-period="custom" aria-pressed="false" onclick="setHistoryPeriod('custom')">自訂區間</button>
             </div>
+            <div id="history-month-fields" class="date-fields" style="display:none;">
+              <label>選擇月份（整個月）<input type="month" id="search-month" onchange="setHistoryPeriod('month')" /></label>
+            </div>
+            <div id="history-custom-fields" class="date-fields" style="display:none;">
+              <label>開始日期<input type="date" id="search-date-from" onchange="updateHistoryDateSummary()" /></label>
+              <label>結束日期<input type="date" id="search-date-to" onchange="updateHistoryDateSummary()" /></label>
+            </div>
+            <div id="history-date-summary" class="date-summary" aria-live="polite">不限日期</div>
           </div>
-          <button onclick="runHistorySearch()" class="btn btn-primary" style="padding:12px;">搜尋</button>
+          <button id="history-search-btn" onclick="runHistorySearch()" class="btn btn-primary" style="padding:12px;">搜尋</button>
         </div>
         <div style="padding:0 16px 16px;">
           <div id="search-result-label" style="font-size:12px;color:var(--ink3);margin-bottom:8px;"></div>
@@ -383,6 +402,10 @@ let currentCategory = '';
 let currentScreen = 'order';
 let savedOrder = null;
 let isReprintMode = false;
+let orderBeforeReprint = null;
+let isSavingOrder = false;
+let historySearchOpened = false;
+let historyPeriod = 'all';
 
 // ── 離線佇列（B方案）──
 const QUEUE_KEY = 'zhuOrderQueue';
@@ -431,15 +454,8 @@ async function deleteOrder(orderId) {
     const data = await r.json();
     if (data.success) {
       alert('已刪除');
-      // 完整重置狀態
-      isReprintMode = false;
-      savedOrder = null;
-      cart = {};
-      currentCustomer = null;
-      goToStep(0);
-      document.getElementById('main-btn').style.display = 'none';
       switchScreen('history');
-      renderHistory();
+      if (document.getElementById('history-view-search').style.display !== 'none') runHistorySearch();
     } else { alert('刪除失敗：' + (data.error || '未知錯誤')); }
   } catch(e) { alert('網路錯誤，無法刪除'); }
 }
@@ -532,6 +548,8 @@ async function apiPost(payload) {
 
 // ── Screen ──
 function switchScreen(s) {
+  if (isSavingOrder) return;
+  if (isReprintMode && s !== 'order') restoreOrderAfterReprint();
   currentScreen = s;
   document.querySelectorAll('.screen').forEach(el => el.style.display = 'none');
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -546,22 +564,35 @@ function switchScreen(s) {
     bb.style.display = 'none';
   }
 
-  if (s === 'history') renderHistory();
+  updateTopbar();
+  if (s === 'history' && document.getElementById('history-view-search').style.display === 'none') renderHistory();
 }
 
 // 點底部「開單」分頁：若在補印模式，重置回正常開單流程
 function goToOrderTab() {
-  if (isReprintMode) {
-    isReprintMode = false;
-    savedOrder = null;
-    cart = {};
-    currentCustomer = null;
-    switchScreen('order');
-    goToStep(0);
-    renderCustomers();
-  } else {
-    switchScreen('order');
+  if (isSavingOrder) return;
+  if (isReprintMode) restoreOrderAfterReprint();
+  switchScreen('order');
+}
+
+function restoreOrderAfterReprint() {
+  const draft = orderBeforeReprint;
+  isReprintMode = false;
+  orderBeforeReprint = null;
+  document.getElementById('receipt-wrap').innerHTML = '';
+  if (!draft) { newOrder(); return; }
+  cart = draft.cart;
+  currentCustomer = draft.customer;
+  savedOrder = draft.savedOrder;
+  currentCategory = draft.category;
+  if (draft.step === 1) renderCategories();
+  if (draft.step === 2) renderCartReview();
+  if (draft.step === 3) {
+    buildReceipt(cartQty(), cartTotal());
+    buildPrintArea(cartQty(), cartTotal());
   }
+  goToStep(draft.step);
+  renderCustomers(document.getElementById('customer-search').value);
 }
 
 // ── Customers ──
@@ -647,12 +678,14 @@ function updateStepIndicator() {
 
 function updateTopbar() {
   const labels = ['選客戶', '選商品', '確認訂單', '收據'];
-  document.getElementById('topbar-step').textContent = labels[currentStep];
+  document.getElementById('topbar-step').textContent = currentScreen === 'order' ? (isReprintMode ? '訂單補印' : labels[currentStep]) : currentScreen === 'history' ? '訂單紀錄' : '設定';
   const backBtn = document.getElementById('topbar-back');
-  backBtn.style.display = currentStep > 0 ? 'block' : 'none';
+  backBtn.style.display = currentScreen === 'order' && currentStep > 0 ? 'block' : 'none';
 }
 
 function goBack() {
+  if (isSavingOrder || currentScreen !== 'order') return;
+  if (isReprintMode) { switchScreen('history'); return; }
   if (currentStep === 1) {
     cart = {};
     currentCustomer = null;
@@ -661,21 +694,15 @@ function goBack() {
   } else if (currentStep === 2) {
     goToStep(1);
   } else if (currentStep === 3) {
-    if (isReprintMode) {
-      // 補印模式返回記錄頁
-      isReprintMode = false;
-      switchScreen('history');
-    } else {
-      goToStep(2);
-      renderCartReview();
-      document.getElementById('main-btn').style.display = 'block';
-      updateBottomBar();
-    }
+    savedOrder = null;
+    goToStep(2);
+    renderCartReview();
   }
 }
 
 function updateBottomBar() {
   const btn = document.getElementById('main-btn');
+  btn.style.display = currentStep < 3 ? 'block' : 'none';
   if (currentStep === 0) {
     btn.textContent = currentCustomer ? `繼續（${currentCustomer.name}）→` : '選擇客戶後繼續';
     btn.disabled = !currentCustomer;
@@ -696,6 +723,7 @@ function updateBottomBar() {
 }
 
 function mainAction() {
+  if (isSavingOrder || isReprintMode) return;
   if (currentStep === 0 && currentCustomer) {
     renderCategories();
     goToStep(1);
@@ -872,6 +900,7 @@ function adjustQty(key, delta) {
 
 // ── Complete Order ──
 async function completeOrder() {
+  if (isReprintMode || isSavingOrder || !currentCustomer || cartQty() <= 0) return;
   const items = cartItems();
   const totalAmount = cartTotal();
   const totalQty = cartQty();
@@ -893,10 +922,17 @@ async function completeOrder() {
 
 // ── 補印訂單 ──
 function reprintOrder(order) {
+  if (isSavingOrder) return;
+  if (!isReprintMode) {
+    orderBeforeReprint = {
+      cart: JSON.parse(JSON.stringify(cart)), customer: currentCustomer,
+      savedOrder, category: currentCategory, step: currentStep
+    };
+  }
   // 從 detail 字串解析商品列表
   // 格式：商品名 x數量($小計)、...
   const items = [];
-  const parts = order.detail.split('、');
+  const parts = String(order.detail || '').split('、');
   parts.forEach(function(part) {
     const m = part.match(/^(.+?) x(\d+)\(\$(\d+)\)$/);
     if (m) {
@@ -908,7 +944,7 @@ function reprintOrder(order) {
   });
 
   // 設定當前客戶
-  currentCustomer = { id: order.customerId, name: order.customerName };
+  // 歷史訂單的客戶只用於補印，不覆蓋尚未完成的新訂單。
 
   // 設定 savedOrder（補印不重新記錄）
   savedOrder = null;
@@ -944,12 +980,15 @@ function buildReprintReceipt(order, items) {
       </div>
     </div>
     <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:8px;">
-      <button id="print-btn" class="btn btn-print" onclick="doPrintReprint(${JSON.stringify(items).replace(/"/g,'&quot;')}, '${order.date}', '${order.customerName}', ${totalQty}, ${totalAmount})">分享給 Thermer 列印</button>
-      <button class="btn btn-line" onclick="shareReprintToLine('${order.date}', '${order.customerName}', ${JSON.stringify(items).replace(/"/g,'&quot;')}, ${totalQty}, ${totalAmount})">分享到 LINE</button>
+      <button id="print-btn" class="btn btn-print">分享給 Thermer 列印</button>
+      <button id="reprint-line-btn" class="btn btn-line">分享到 LINE</button>
       <button class="btn btn-ghost" onclick="switchScreen('history')">返回記錄</button>
-      <button class="btn" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;" onclick="deleteOrder('${order.orderId}')">刪除這筆訂單</button>
+      <button id="reprint-delete-btn" class="btn" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;">刪除這筆訂單</button>
     </div>`;
 
+  document.getElementById('print-btn').onclick = () => doPrintReprint(items, order.date, order.customerName, totalQty, totalAmount);
+  document.getElementById('reprint-line-btn').onclick = () => shareReprintToLine(order.date, order.customerName, items, totalQty, totalAmount);
+  document.getElementById('reprint-delete-btn').onclick = () => deleteOrder(order.orderId);
   isReprintMode = true;
   switchScreen('order');
   goToStep(3);
@@ -1044,6 +1083,12 @@ async function doPrintReprint(items, dateStr, customerName, totalQty, totalAmt) 
 }
 
 async function completeAndSave() {
+  if (isSavingOrder || isReprintMode || !savedOrder) return;
+  isSavingOrder = true;
+  const completeButton = document.getElementById('complete-order-btn');
+  if (completeButton) { completeButton.disabled = true; completeButton.textContent = '儲存中…'; }
+  const pendingOrder = savedOrder;
+  try {
   if (savedOrder) {
     const order = Object.assign({}, savedOrder);
     savedOrder = null;
@@ -1066,6 +1111,13 @@ async function completeAndSave() {
     }
   }
   newOrder();
+  } catch (error) {
+    savedOrder = pendingOrder;
+    alert('訂單尚未完成儲存，請勿關閉此頁。請重試，或確認手機可用儲存空間。');
+  } finally {
+    isSavingOrder = false;
+    if (completeButton) { completeButton.disabled = false; completeButton.textContent = '完成'; }
+  }
 }
 
 function buildReceipt(totalQty, totalAmount) {
@@ -1100,8 +1152,8 @@ function buildReceipt(totalQty, totalAmount) {
     </div>
     <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:8px;">
       <button id="print-btn" class="btn btn-print" onclick="doPrint()">分享給 Thermer 列印</button>
-      <button class="btn btn-line" onclick="shareToLine()">分享到 LINE</button>
-      <button class="btn btn-primary" onclick="completeAndSave()" style="background:#1D9E75;">完成</button>
+      <button id="receipt-line-btn" class="btn btn-line" onclick="shareToLine()">分享到 LINE</button>
+      <button id="complete-order-btn" class="btn btn-primary" onclick="completeAndSave()" style="background:#1D9E75;">完成</button>
     </div>`;
 }
 
@@ -1318,11 +1370,21 @@ function diagnosePrinter() {
 }
 
 function shareToLine() {
-  const text = receiptText();
-  window.open('https://line.me/R/share?text=' + encodeURIComponent(text), '_blank');
+  if (!savedOrder || isReprintMode || isSavingOrder) return;
+  const dateEl = document.querySelector('#receipt-wrap .receipt-header p');
+  const order = savedOrder;
+  return shareReprintToLine(dateEl ? dateEl.textContent : todayStr(), order.customerName,
+    order.items, order.totalQty, order.totalAmount, 'receipt-line-btn');
 }
 
-function shareReprintToLine(dateStr, customerName, items, totalQty, totalAmt) {
+let lineImageSharing = false;
+
+async function shareReprintToLine(dateStr, customerName, items, totalQty, totalAmt, buttonId = 'reprint-line-btn') {
+  if (lineImageSharing) return;
+  lineImageSharing = true;
+  const button = document.getElementById(buttonId);
+  if (button) { button.disabled = true; button.textContent = '準備圖片…'; }
+  try {
   // 用跟列印一樣的 Canvas 產生圖片，再分享到 LINE
   const PX = 2;
   const W = 384 * PX;
@@ -1391,20 +1453,72 @@ function shareReprintToLine(dateStr, customerName, items, totalQty, totalAmt) {
   var finalCanvas = document.createElement('canvas');
   finalCanvas.width = W; finalCanvas.height = y + MARGIN;
   var fCtx = finalCanvas.getContext('2d');
+  fCtx.fillStyle = '#ffffff';
+  fCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
   fCtx.drawImage(canvas, 0, 0);
 
-  finalCanvas.toBlob(async function(blob) {
-    if (!blob) return;
-    var file = new File([blob], 'receipt.png', { type: 'image/png' });
+  // 同步建立檔案，讓系統分享仍由這次點擊觸發。
+  const imageUrl = finalCanvas.toDataURL('image/png');
+  const raw = atob(imageUrl.split(',')[1]);
+  const bytes = Uint8Array.from(raw, character => character.charCodeAt(0));
+  const file = new File([bytes], '竹緣訂單_' + String(dateStr).slice(0,10).replace(/[^0-9]/g, '') + '.png', { type: 'image/png' });
+  try {
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: '竹緣開運竹 收據' }); } catch(e) {}
+      // 手機會開啟系統分享選單，由使用者選擇 LINE 與收件人。
+      await navigator.share({ files: [file] });
+    } else {
+      showLineImagePreview(imageUrl);
     }
-  }, 'image/png');
+  } catch (error) {
+    if (error.name !== 'AbortError') showLineImagePreview(imageUrl);
+  }
+  } catch (error) {
+    alert('無法產生訂單圖片，請再試一次。');
+  } finally {
+    lineImageSharing = false;
+    if (button) { button.disabled = false; button.textContent = '分享到 LINE'; }
+  }
+}
+
+function showLineImagePreview(imageUrl) {
+  const existing = document.getElementById('line-image-preview');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'line-image-preview';
+  overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', '訂單圖片');
+  const panel = document.createElement('div');
+  panel.className = 'modal';
+  panel.style.cssText = 'max-height:90vh;overflow:auto;';
+  const instructions = document.createElement('p');
+  instructions.textContent = '請長按圖片儲存，再到 LINE 選擇照片傳送。';
+  instructions.style.marginBottom = '12px';
+  const picture = document.createElement('img');
+  picture.src = imageUrl;
+  picture.alt = '竹緣開運竹訂單圖片';
+  picture.style.cssText = 'display:block;width:100%;height:auto;';
+  const close = document.createElement('button');
+  close.className = 'btn btn-ghost';
+  close.textContent = '關閉';
+  close.onclick = () => overlay.remove();
+  panel.appendChild(instructions);
+  panel.appendChild(picture);
+  panel.appendChild(close);
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+  close.focus();
 }
 
 function newOrder() {
+  isReprintMode = false;
+  orderBeforeReprint = null;
+  savedOrder = null;
   cart = {};
   currentCustomer = null;
+  document.getElementById('receipt-wrap').innerHTML = '';
+  document.getElementById('print-area').innerHTML = '';
   document.getElementById('main-btn').style.display = 'block';
   document.getElementById('customer-search').value = '';
   goToStep(0);
@@ -1417,40 +1531,28 @@ function todayStr() {
   return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 }
 
+let historyLoadId = 0;
 async function renderHistory() {
+  const loadId = ++historyLoadId;
   const listEl = document.getElementById('history-today-list');
-  const title  = document.getElementById('today-title');
-  const now = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  const todaySlash = `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())}`;
-  const todayDash  = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-  title.textContent = `今天的訂單（${todaySlash}）`;
-  listEl.innerHTML = '<div class="empty">載入中...</div>';
-
-  let orders = [];
-  if (API_URL) {
-    try {
-      const r = await fetch(`${API_URL}?action=getAllOrders`);
-      const data = await r.json();
-      if (Array.isArray(data)) orders = data;
-    } catch(e) {}
+  const today = todayStr().replace(/-/g, '/');
+  document.getElementById('today-title').textContent = '今天的訂單（' + today + '）';
+  listEl.innerHTML = '<div class="empty">載入中…</div>';
+  try {
+    if (!API_URL) throw new Error('尚未設定連線網址');
+    const orders = await fetchHistoryOrders();
+    if (loadId !== historyLoadId) return;
+    const todayOrders = orders.filter(order => order && String(order.date || '').slice(0,10).replace(/-/g, '/') === today);
+    if (!todayOrders.length) { listEl.innerHTML = '<div class="empty">今天尚無訂單</div>'; return; }
+    renderHistoryCards(listEl, todayOrders);
+  } catch (error) {
+    if (loadId !== historyLoadId) return;
+    listEl.innerHTML = '';
+    const message = document.createElement('div');
+    message.className = 'empty';
+    message.textContent = '讀取失敗：' + error.message;
+    listEl.appendChild(message);
   }
-
-  // 同時支援 2026/05/08 和 2026-05-08 格式
-  const todayOrders = orders.filter(o => o.date && (
-    o.date.startsWith(todaySlash) || o.date.startsWith(todayDash)
-  ));
-
-  if (!todayOrders.length) {
-    listEl.innerHTML = '<div class="empty">今天尚無訂單</div>';
-    return;
-  }
-  listEl.innerHTML = todayOrders.map(o => `
-    <div class="history-card" onclick="reprintOrder(${JSON.stringify(o).replace(/"/g,'&quot;')})" style="cursor:pointer;">
-      <div class="history-date">${o.date} ・ ${o.customerName || ''}</div>
-      <div class="history-detail">${o.detail}</div>
-      <div class="history-amount">共${o.totalQty}盆 · $${(o.totalAmount||0).toLocaleString()} <span style="float:right;color:var(--green);font-size:12px;">🖨️ 補印</span></div>
-    </div>`).join('');
 }
 
 function openHistorySearch() {
@@ -1458,67 +1560,188 @@ function openHistorySearch() {
   document.getElementById('history-view-search').style.display = 'block';
   // 填入客戶選單
   const sel = document.getElementById('search-customer');
-  sel.innerHTML = '<option value="">全部客戶</option>' +
-    customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-  // 預設日期填今天
-  const today = todayStr();
-  document.getElementById('search-date-from').value = today;
-  document.getElementById('search-date-to').value = today;
-  document.getElementById('history-search-list').innerHTML = '';
-  document.getElementById('search-result-label').textContent = '';
+  const previousCustomer = sel.value;
+  sel.innerHTML = '<option value="">全部客戶</option>';
+  customers.forEach(customer => {
+    const option = document.createElement('option');
+    option.value = customer.id;
+    option.textContent = customer.name;
+    sel.appendChild(option);
+  });
+  sel.value = customers.some(c => String(c.id) === previousCustomer) ? previousCustomer : '';
+  if (!historySearchOpened) {
+    setHistoryPeriod('all');
+    historySearchOpened = true;
+  }
 }
 
 function closeHistorySearch() {
   document.getElementById('history-view-search').style.display = 'none';
   document.getElementById('history-view-today').style.display = 'block';
+  renderHistory();
+}
+
+function historyDateValue(date) {
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+}
+
+function setHistoryPeriod(period) {
+  if (historySearchBusy) return;
+  historyPeriod = period;
+  const now = new Date();
+  let from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let to = new Date(from);
+  const start = document.getElementById('search-date-from');
+  const end = document.getElementById('search-date-to');
+  const month = document.getElementById('search-month');
+  document.querySelectorAll('[data-period]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.period === period)));
+  document.getElementById('history-month-fields').style.display = period === 'month' ? 'flex' : 'none';
+  document.getElementById('history-custom-fields').style.display = period === 'custom' ? 'flex' : 'none';
+  if (period === 'custom') {
+    if (!start.value && !end.value) start.value = end.value = historyDateValue(now);
+  } else if (period === 'all') {
+    start.value = end.value = '';
+  } else {
+    if (period === 'week') from.setDate(from.getDate() - 6);
+    if (period === 'thisMonth') from.setDate(1);
+    if (period === 'lastMonth') {
+      from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      to = new Date(now.getFullYear(), now.getMonth(), 0);
+    }
+    if (period === 'month') {
+      if (!month.value) month.value = historyDateValue(now).slice(0, 7);
+      const [year, monthNumber] = month.value.split('-').map(Number);
+      from = new Date(year, monthNumber - 1, 1);
+      to = new Date(year, monthNumber, 0);
+    }
+    start.value = historyDateValue(from);
+    end.value = historyDateValue(to);
+  }
+  updateHistoryDateSummary();
+}
+
+function updateHistoryDateSummary() {
+  const from = document.getElementById('search-date-from').value;
+  const to = document.getElementById('search-date-to').value;
+  document.getElementById('history-date-summary').textContent = !from && !to ? '不限日期' : from === to ? from.replace(/-/g, '/') : (from ? from.replace(/-/g, '/') : '最早') + ' ～ ' + (to ? to.replace(/-/g, '/') : '至今');
+  document.getElementById('history-search-list').innerHTML = '';
+  document.getElementById('search-result-label').textContent = '';
+}
+
+let historySearchBusy = false;
+
+function renderHistoryCards(listEl, orders) {
+    listEl.innerHTML = '';
+    orders.forEach(order => {
+      const card = document.createElement('div');
+      card.className = 'history-card';
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', () => reprintOrder(order));
+      const date = document.createElement('div');
+      date.className = 'history-date';
+      date.textContent = (order.date || '') + ' ・ ' + (order.customerName || '');
+      const detail = document.createElement('div');
+      detail.className = 'history-detail';
+      detail.textContent = order.detail || '';
+      const amount = document.createElement('div');
+      amount.className = 'history-amount';
+      amount.textContent = '共' + (Number(order.totalQty) || 0) + '盆 · $' + (Number(order.totalAmount) || 0).toLocaleString();
+      const print = document.createElement('span');
+      print.style.cssText = 'float:right;color:var(--green);font-size:12px;';
+      print.textContent = '🖨️ 補印';
+      amount.appendChild(print);
+      card.appendChild(date);
+      card.appendChild(detail);
+      card.appendChild(amount);
+      listEl.appendChild(card);
+    });
+}
+
+async function fetchHistoryOrders() {
+  const controller = new AbortController();
+  let timeoutId;
+  try {
+    const request = (async () => {
+      const response = await fetch(API_URL + '?action=getAllOrders', { signal: controller.signal });
+      if (!response.ok) throw new Error('伺服器回應異常（HTTP ' + response.status + '）');
+      const data = await response.json();
+      if (!Array.isArray(data)) {
+        throw new Error(data && data.error ? String(data.error) : '伺服器回傳的訂單格式不正確');
+      }
+      return data;
+    })();
+    const timeout = new Promise((resolve, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error('查詢超過 20 秒，請確認網路後再試一次。'));
+        controller.abort();
+      }, 20000);
+    });
+    return await Promise.race([request, timeout]);
+
+  } finally { clearTimeout(timeoutId); }
 }
 
 async function runHistorySearch() {
+  if (historySearchBusy) return;
   const customerId = document.getElementById('search-customer').value;
-  const dateFrom   = document.getElementById('search-date-from').value;
-  const dateTo     = document.getElementById('search-date-to').value;
-  const listEl     = document.getElementById('history-search-list');
-  const labelEl    = document.getElementById('search-result-label');
-
-  listEl.innerHTML = '<div class="empty">查詢中...</div>';
+  const dateFrom = document.getElementById('search-date-from').value;
+  const dateTo = document.getElementById('search-date-to').value;
+  const listEl = document.getElementById('history-search-list');
+  const labelEl = document.getElementById('search-result-label');
+  const button = document.getElementById('history-search-btn');
+  const showMessage = message => {
+    listEl.innerHTML = '';
+    const messageEl = document.createElement('div');
+    messageEl.className = 'empty';
+    messageEl.textContent = message;
+    listEl.appendChild(messageEl);
+  };
+  const dateKey = value => {
+    const match = String(value || '').trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:$|[ T])/);
+    return match ? match[1] + '/' + match[2].padStart(2, '0') + '/' + match[3].padStart(2, '0') : '';
+  };
   labelEl.textContent = '';
-
-  let orders = [];
-  if (API_URL) {
-    try {
-      if (customerId) {
-        const r = await fetch(`${API_URL}?action=getCustomerOrders&customerId=${customerId}`);
-        orders = await r.json();
-      } else {
-        const r = await fetch(`${API_URL}?action=getAllOrders`);
-        orders = await r.json();
-      }
-    } catch(e) { orders = []; }
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    showMessage('開始日期不能晚於結束日期，請調整後再搜尋。');
+    return;
   }
-
-  // 日期篩選（統一轉成 yyyy/MM/dd 格式比對）
-  function toSlash(d) { return d ? d.replace(/-/g, '/') : ''; }
-  const fromSlash = toSlash(dateFrom);
-  const toSlash2  = toSlash(dateTo);
-  if (fromSlash) orders = orders.filter(o => o.date && o.date.slice(0,10) >= fromSlash);
-  if (toSlash2)  orders = orders.filter(o => o.date && o.date.slice(0,10) <= toSlash2);
-
-  if (!orders.length) {
-    listEl.innerHTML = '<div class="empty">查無符合的訂單</div>';
-    labelEl.textContent = '';
+  if (!API_URL) {
+    showMessage('尚未設定連線網址，請先到設定頁設定。');
     return;
   }
 
-  const totalAmt = orders.reduce((s, o) => s + (o.totalAmount||0), 0);
-  const totalQty = orders.reduce((s, o) => s + (o.totalQty||0), 0);
-  labelEl.textContent = `共 ${orders.length} 筆・${totalQty} 盆・$${totalAmt.toLocaleString()}`;
-
-  listEl.innerHTML = orders.map(o => `
-    <div class="history-card" onclick="reprintOrder(${JSON.stringify(o).replace(/"/g,'&quot;')})" style="cursor:pointer;">
-      <div class="history-date">${o.date} ・ ${o.customerName || ''}</div>
-      <div class="history-detail">${o.detail}</div>
-      <div class="history-amount">共${o.totalQty}盆 · $${(o.totalAmount||0).toLocaleString()} <span style="float:right;color:var(--green);font-size:12px;">🖨️ 補印</span></div>
-    </div>`).join('');
+  historySearchBusy = true;
+  if (button) { button.disabled = true; button.textContent = '查詢中…'; }
+  showMessage('查詢中…');
+  document.querySelectorAll('#history-view-search input, #history-view-search select, [data-period]').forEach(el => el.disabled = true);
+  try {
+    // 沿用紀錄頁的 API；一次取得訂單後，在手機篩選客戶與日期。
+    // Promise.race 同時涵蓋等待回應與讀取 JSON，避免無限等待。
+    let orders = await fetchHistoryOrders();
+    const from = dateKey(dateFrom);
+    const to = dateKey(dateTo);
+    orders = orders.filter(order => {
+      if (!order || (customerId && String(order.customerId) !== String(customerId))) return false;
+      const day = dateKey(order.date);
+      if ((from || to) && !day) return false;
+      return (!from || day >= from) && (!to || day <= to);
+    });
+    if (!orders.length) {
+      showMessage('查無符合的訂單');
+      return;
+    }
+    const totalAmount = orders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0);
+    const totalQty = orders.reduce((sum, order) => sum + (Number(order.totalQty) || 0), 0);
+    labelEl.textContent = '共 ' + orders.length + ' 筆・' + totalQty + ' 盆・$' + totalAmount.toLocaleString();
+    renderHistoryCards(listEl, orders);
+  } catch (error) {
+    const message = error && error.message ? error.message : '請確認網路後再試一次。';
+    showMessage('查詢失敗：' + message);
+  } finally {
+    historySearchBusy = false;
+    document.querySelectorAll('#history-view-search input, #history-view-search select, [data-period]').forEach(el => el.disabled = false);
+    if (button) { button.disabled = false; button.textContent = '搜尋'; }
+  }
 }
 
 // ── Settings ──
