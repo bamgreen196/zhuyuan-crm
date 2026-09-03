@@ -108,6 +108,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .stock-item.low { border-left-color: var(--red); background: #fff8f8; }
 .si-name { font-size: 19px; font-weight: 700; }
 .si-sub  { font-size: 14px; color: var(--gray); margin-top: 4px; }
+.si-details { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.si-stock { flex-shrink: 0; margin-left: 12px; }
+.si-dimensions { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 15px; color: var(--green-d); }
+.si-dimensions span { white-space: nowrap; }
 .si-num  { font-size: 40px; font-weight: 700; color: var(--green-d); line-height: 1; text-align: right; }
 .stock-item.low .si-num { color: var(--red); }
 .si-min  { font-size: 13px; color: var(--gray); text-align: right; margin-top: 4px; }
@@ -743,8 +747,18 @@ async function loadStock() {
     allItems=r.items;filterStock();status.textContent='更新於 '+new Date().toLocaleTimeString('zh-TW')+'　';
   }catch(e){allItems=[];list.textContent='載入失敗：'+e.message;status.textContent='⚠ 庫存未更新　';}
 }
+function stockDimensionsV3(item) {
+  // 沿用電腦版的欄位對應：length=寬、width=深、height=高，單位 cm。
+  const parts=[['length','寬'],['width','深'],['height','高']].flatMap(([key,label])=>{
+    const value=item[key];
+    if(value==null||String(value).trim()===''||typeof value==='boolean')return [];
+    const n=Number(value);if(!Number.isFinite(n)||n<=0)return [];
+    return ['<span>'+label+' '+n+' cm</span>'];
+  });
+  return parts.length?'<div class="si-dimensions">'+parts.join('')+'</div>':'';
+}
 function renderStock(items) {
-  document.getElementById('stockList').innerHTML=items.length?items.map(i=>'<div class="stock-item'+(i.isLow?' low':'')+'"><div style="min-width:0"><div class="si-name">'+escapeV2(i.name+' / '+i.color)+'</div><div class="si-sub">'+escapeV2(i.vendor+'　貨號：'+i.vendorCode)+'　$'+Number(i.price)+'</div></div><div><div class="si-num">'+Number(i.stock)+'</div><div class="si-min">警示：'+Number(i.minStock)+'</div></div></div>').join(''):'沒有找到品項';
+  document.getElementById('stockList').innerHTML=items.length?items.map(i=>'<div class="stock-item'+(i.isLow?' low':'')+'"><div class="si-details"><div class="si-name">'+escapeV2(i.name+' / '+i.color)+'</div><div class="si-sub">'+escapeV2(i.vendor+'　貨號：'+i.vendorCode)+'　$'+Number(i.price)+'</div>'+stockDimensionsV3(i)+'</div><div class="si-stock"><div class="si-num">'+Number(i.stock)+'</div><div class="si-min">警示：'+Number(i.minStock)+'</div></div></div>').join(''):'沒有找到品項';
 }
 
 </script>
