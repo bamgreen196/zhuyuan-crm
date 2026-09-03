@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="盆器庫存">
+<title>盆器庫存 · 手機版</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --green:    #2d7d46; --green-l: #e8f5ec; --green-d: #1a5c30;
+  --red:      #c0392b; --red-l:   #fdecea;
+  --orange:   #e67e22; --orange-l:#fef5ec;
+  --yellow:   #f39c12; --yellow-l:#fef9e7;
+  --gray:     #6c757d; --gray-l:  #f4f6f8;
+  --border:   #dee2e6;
+  --shadow:   0 2px 12px rgba(0,0,0,0.08);
+  --radius:   14px;
+  --font:     'Noto Sans TC', -apple-system, sans-serif;
+}
+
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font); background: var(--gray-l); color: #333;
+  display: flex; flex-direction: column;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+}
+
+/* ── 頂部 ── */
+header {
+  background: var(--green); color: #fff;
+  padding: 16px 18px; display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+header h1 { font-size: 20px; font-weight: 700; }
+
+/* ── 內容區 ── */
+.content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── 底部 Tab ── */
+.bottom-nav {
+  flex-shrink: 0; background: #fff; border-top: 1.5px solid var(--border);
+  display: flex; padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.bottom-nav button {
+  flex: 1; padding: 12px 4px 10px; border: none; background: none;
+  font-size: 13px; font-weight: 700; color: var(--gray); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-family: var(--font);
+}
+.bottom-nav button .icon { font-size: 26px; line-height: 1; }
+.bottom-nav button.active { color: var(--green); }
+
+/* ── 頁面 ── */
+.page { display: none; padding: 16px; }
+.page.active { display: block; }
+
+/* ── 卡片 ── */
+.card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; margin-bottom: 16px; }
+.card-title { font-size: 17px; font-weight: 700; color: var(--green-d); margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+
+/* ── 表單 ── */
+.form-group { margin-bottom: 14px; }
+label { display: block; font-size: 15px; font-weight: 600; color: #555; margin-bottom: 6px; }
+input[type=text], input[type=number], input[type=url], select, textarea {
+  width: 100%; padding: 14px 16px;
+  border: 2px solid var(--border); border-radius: 12px;
+  font-size: 17px; font-family: var(--font);
+  background: #fafafa; -webkit-appearance: none;
+  color: #333;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--green); background: #fff; }
+
+/* ── 按鈕 ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 15px 24px; border: none; border-radius: 12px;
+  font-size: 17px; font-weight: 700; cursor: pointer; font-family: var(--font);
+  width: 100%; transition: opacity .15s;
+}
+.btn:active { opacity: 0.75; }
+.btn-green  { background: var(--green);  color: #fff; }
+.btn-orange { background: var(--orange); color: #fff; }
+.btn-gray   { background: #e9ecef; color: #555; }
+.btn-red    { background: var(--red); color: #fff; }
+.btn-sm     { padding: 10px 16px; font-size: 15px; width: auto; }
+
+/* ── 訊息 ── */
+.msg { padding: 14px 16px; border-radius: 12px; font-size: 16px; font-weight: 600; margin-bottom: 14px; display: none; }
+.msg.show { display: block; }
+.msg.ok   { background: var(--green-l); color: var(--green-d); }
+.msg.err  { background: var(--red-l);   color: var(--red); }
+.msg.warn { background: var(--yellow-l); color: #856404; }
+
+/* ── Loading ── */
+.loading { text-align: center; padding: 40px 20px; color: var(--gray); font-size: 16px; }
+.spinner { display: inline-block; width: 32px; height: 32px; border: 4px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; margin-bottom: 10px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── 庫存列表 ── */
+.stock-item {
+  background: #fff; border-radius: var(--radius); padding: 16px 18px;
+  box-shadow: var(--shadow); display: flex; justify-content: space-between;
+  align-items: center; border-left: 5px solid var(--green); margin-bottom: 12px;
+}
+.stock-item.low { border-left-color: var(--red); background: #fff8f8; }
+.si-name { font-size: 19px; font-weight: 700; }
+.si-sub  { font-size: 14px; color: var(--gray); margin-top: 4px; }
+.si-num  { font-size: 40px; font-weight: 700; color: var(--green-d); line-height: 1; text-align: right; }
+.stock-item.low .si-num { color: var(--red); }
+.si-min  { font-size: 13px; color: var(--gray); text-align: right; margin-top: 4px; }
+.low-badge { display: inline-block; background: var(--red); color: #fff; font-size: 12px; padding: 3px 10px; border-radius: 20px; margin-left: 8px; vertical-align: middle; }
+
+/* ── 搜尋列 ── */
+.search-bar { display: flex; gap: 10px; margin-bottom: 16px; }
+.search-bar input { flex: 1; }
+.search-bar .btn { width: auto; padding: 14px 18px; }
+
+/* ── 成本計算 ── */
+.bamboo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.bamboo-cell { background: var(--green-l); border-radius: 12px; padding: 14px 10px; text-align: center; }
+.bamboo-cell label { font-size: 15px; font-weight: 700; color: var(--green-d); margin-bottom: 4px; display: block; }
+.bamboo-cell .bhint { font-size: 13px; color: var(--gray); margin-bottom: 8px; }
+.bamboo-cell input { text-align: center; font-size: 22px; font-weight: 700; padding: 10px 4px; background: #fff; }
+
+.acc-grid { display: flex; flex-direction: column; gap: 12px; }
+.acc-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #fafafa; border-radius: 12px; border: 1.5px solid var(--border); }
+.acc-item label { font-size: 16px; font-weight: 600; }
+.acc-hint { font-size: 13px; color: var(--gray); }
+.acc-item input { width: 90px; text-align: center; font-size: 22px; font-weight: 700; padding: 8px 4px; background: #fff; }
+
+.pot-manual-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.result-card { background: var(--green-d); color: #fff; border-radius: var(--radius); padding: 24px 20px; text-align: center; margin-bottom: 16px; }
+.r-label { font-size: 15px; opacity: .8; margin-bottom: 6px; }
+.r-total { font-size: 60px; font-weight: 700; line-height: 1; }
+.r-unit  { font-size: 22px; margin-left: 4px; }
+.result-bk { margin-top: 16px; text-align: left; border-top: 1px solid rgba(255,255,255,.2); padding-top: 14px; }
+.bk-row { display: flex; justify-content: space-between; font-size: 16px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+.bk-row b { font-weight: 700; }
+
+.model-item { background: #fff; border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+.model-item:active { opacity: .8; }
+.m-name { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+.m-cost { font-size: 26px; font-weight: 700; color: var(--green-d); white-space: nowrap; }
+.m-sub  { font-size: 13px; color: var(--gray); margin-top: 4px; }
+.model-tag { display: inline-block; background: var(--green-l); color: var(--green-d); border-radius: 20px; font-size: 13px; padding: 3px 10px; margin: 3px 3px 3px 0; font-weight: 600; }
+
+.empty-state { text-align: center; padding: 50px 20px; color: var(--gray); }
+.empty-state .icon { font-size: 56px; margin-bottom: 14px; }
+.empty-state p { font-size: 17px; }
+
+/* ── 設定頁 ── */
+.settings-label { font-size: 15px; font-weight: 700; color: #555; margin-bottom: 6px; display: block; }
+.settings-hint  { font-size: 13px; color: var(--gray); margin-top: 6px; }
+.conn-status { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 700; margin-top: 10px; }
+.conn-ok  { background: var(--green-l); color: var(--green-d); }
+.conn-err { background: var(--red-l);   color: var(--red); }
+</style>
+</head>
+<body>
+
+<header><span>🪴</span><h1>盆器庫存 · 手機版</h1></header>
+
+<div class="content">
+
+  <!-- ══ 庫存查詢 ══ -->
+  <div id="stockPage" class="page active">
+    <div class="search-bar">
+      <input type="text" id="stockKw" placeholder="搜尋品名、顏色、廠商..." autocomplete="off"
+        oninput="filterStock()" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <button class="btn btn-gray btn-sm" onclick="clearStock()">✕</button>
+    </div>
+    <div id="stockList"><div class="loading"><div class="spinner"></div><br>載入中...</div></div>
+  </div>
+
+  <!-- ══ 成本計算 ══ -->
+  
+<div id="logPage" class="page">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:17px;font-weight:700;color:#2d7d46;">今日出庫記錄</div>
+      <div id="logStatus" style="font-size:12px;color:#888;">載入中...</div>
+    </div>
+    <div id="latestCard" style="display:none;background:#e8f5ec;border-radius:10px;padding:12px 14px;border-left:3px solid #2d7d46;margin-bottom:14px;">
+      <div style="font-size:11px;color:#2d7d46;margin-bottom:4px;font-weight:600;">最新一筆</div>
+      <div id="latestName" style="font-size:17px;font-weight:700;color:#1a5c30;"></div>
+      <div id="latestMeta" style="font-size:13px;color:#2d7d46;margin-top:2px;"></div>
+      <div id="latestTime" style="font-size:12px;color:#555;margin-top:3px;"></div>
+    </div>
+    <div id="logList"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid #e0e0e0;">
+      <div id="logTotal" style="font-size:13px;color:#666;"></div>
+      <button class="btn btn-gray btn-sm" onclick="loadLog()">手動更新</button>
+    </div>
+  </div>
+</div>
+
+<div id="costPage" class="page">
+    <div class="card">
+      <div class="card-title">🧮 成本計算</div>
+      <div class="form-group">
+        <label>型號名稱</label>
+        <input type="text" id="costModelName" placeholder="例：308、508大紅…">
+      </div>
+      <div class="form-group">
+        <label>備註（選填）</label>
+        <input type="text" id="costModelNote" placeholder="例：適用場合、特殊說明...">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎋 開運竹數量</div>
+      <div id="bambooGrid" class="bamboo-grid">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🪴 盆器</div>
+      <div class="form-group">
+        <label>從庫存選擇</label>
+        <select id="costPotSelect" onchange="onCostPotSelect()">
+          <option value="">— 載入中… —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>或手動輸入名稱與金額</label>
+        <div class="pot-manual-row">
+          <input type="text"   id="costPotName"  placeholder="盆器名稱">
+          <input type="number" id="costPotPrice" placeholder="金額" min="0" step="0.5" inputmode="decimal">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎀 配件</div>
+      <div id="accGrid" class="acc-grid">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-bottom:16px;">
+      <button class="btn btn-green" onclick="calcCost()">🧮 計算</button>
+      <button class="btn btn-green" style="background:var(--green-d);" onclick="saveCostModel()">💾 儲存</button>
+      <button class="btn btn-gray btn-sm" style="width:auto;" onclick="clearCost()">清除</button>
+    </div>
+
+    <div id="costResult" style="display:none;" class="result-card">
+      <div class="r-label">總成本</div>
+      <div><span class="r-total" id="costTotal">0</span><span class="r-unit">元</span></div>
+      <div class="result-bk" id="costBreakdown"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 已儲存型號</div>
+      <div id="costModelList"><div class="loading"><div class="spinner"></div><br>載入中...</div></div>
+    </div>
+  </div>
+
+  <!-- ══ 設定 ══ -->
+  <div id="settingPage" class="page">
+    <div class="card">
+      <div class="card-title">⚙️ 連線設定</div>
+      <div class="form-group">
+        <label class="settings-label">Apps Script 網址</label>
+        <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+        <div class="settings-hint">從 Apps Script 部署頁面複製網址後貼入</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button class="btn btn-green" onclick="saveAndTest()">💾 儲存並測試</button>
+      </div>
+      <div id="connStatus"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">ℹ️ 關於</div>
+      <p style="font-size:15px;color:var(--gray);line-height:1.8;">
+        盆器庫存管理系統 · 手機版<br>
+        功能：庫存查詢 · 成本計算<br>
+        資料來源：Google Sheets
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<nav class="bottom-nav">
+  <button class="active" onclick="switchPage('stockPage',this)">
+    <span class="icon">🔍</span>庫存查詢
+  </button>
+  <button onclick="switchPage('logPage',this)">
+    <span class="icon">📤</span>出庫記錄
+  </button>
+  <button onclick="switchPage('costPage',this)">
+    <span class="icon">🧮</span>成本計算
+  </button>
+  <button onclick="switchPage('settingPage',this)">
+    <span class="icon">⚙️</span>設定
+  </button>
+</nav>
+
+<script>
+// ── API 設定 ──
+let API_URL = localStorage.getItem('potMobileApiUrl') || 'https://script.google.com/macros/s/AKfycbykFf-hEqrgtNmVBfhYUxmANwc2cRNBeVJU2K0iHWMP0VXflxzu11Pq1VJWoTUUXFOBAQ/exec';
+let allItems = [];
+let bambooSizes = [], accessories = [];
+
+// ── API 呼叫 ──
+async function apiGet(action) {
+  if (!API_URL) throw new Error('請先在設定頁輸入 Apps Script 網址');
+  const res = await fetch(API_URL + '?action=' + action);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.json();
+}
+
+
+
+// ── 頁面切換 ──
+function switchPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.bottom-nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'stockPage')   loadStock();
+  if (id === 'costPage')    initCostPage();
+  if (id === 'settingPage') loadSettings();
+  if (id === 'logPage')     { startLogPolling(); loadLog(); }
+  else stopLogPolling();
+}
+
+// ── 庫存查詢 ──
+
+
+function filterStock() {
+  const kw = document.getElementById('stockKw').value.trim().toLowerCase();
+  if (!kw) { renderStock(allItems); return; }
+  renderStock(allItems.filter(i =>
+    i.name.toLowerCase().includes(kw) ||
+    (i.color && i.color.toLowerCase().includes(kw)) ||
+    (i.vendor && i.vendor.toLowerCase().includes(kw)) ||
+    (i.vendorCode && i.vendorCode.toLowerCase().includes(kw))
+  ));
+}
+
+function clearStock() {
+  document.getElementById('stockKw').value = '';
+  renderStock(allItems);
+}
+
+
+
+// ── 成本計算 ──
+
+
+async function loadCostParams() {
+  document.getElementById('bambooGrid').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  document.getElementById('accGrid').innerHTML    = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const res = await apiGet('getCostParams');
+    if (!res.success) throw new Error(res.error);
+    bambooSizes = res.params.filter(p => p.name.startsWith('開運竹'));
+    accessories = res.params.filter(p => !p.name.startsWith('開運竹'));
+    buildBambooGrid();
+    buildAccGrid();
+  } catch(e) {
+    document.getElementById('bambooGrid').innerHTML = '<p style="color:var(--red);padding:10px;font-size:15px;">❌ ' + e.message + '</p>';
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ── 設定 ──
+function loadSettings() {
+  document.getElementById('apiUrlInput').value = API_URL || '';
+}
+
+async function saveAndTest() {
+  const url = document.getElementById('apiUrlInput').value.trim();
+  if (!url) { alert('請輸入網址'); return; }
+  const statusEl = document.getElementById('connStatus');
+  statusEl.innerHTML = '<span class="conn-status" style="background:var(--yellow-l);color:#856404;">⏳ 測試中...</span>';
+  try {
+    const res = await fetch(url + '?action=getItems');
+    const data = await res.json();
+    if (data.success) {
+      API_URL = url;
+      localStorage.setItem('potMobileApiUrl', url);
+      statusEl.innerHTML = '<span class="conn-status conn-ok">✅ 連線成功！共 ' + data.items.length + ' 筆品項</span>';
+      allItems = data.items;
+    } else {
+      statusEl.innerHTML = '<span class="conn-status conn-err">❌ ' + data.error + '</span>';
+    }
+  } catch(e) {
+    statusEl.innerHTML = '<span class="conn-status conn-err">❌ 連線失敗：' + e.message + '</span>';
+  }
+}
+
+// ── 初始化 ──
+window.onload = () => {
+  if (API_URL) loadStock();
+  else {
+    document.getElementById('stockList').innerHTML = '<div class="empty-state"><div class="icon">⚙️</div><p>請先點右下角「設定」輸入 Apps Script 網址</p></div>';
+  }
+};
+
+// ── 出庫記錄 ──
+let _logTimer = null;
+
+
+
+
+
+
+
+
+
+
+
+
+// ===== 成本頁 v2：名稱／日期／備註／成本，明細只在編輯時展開 =====
+function escapeV2(v) { return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function uidV2() { return 'op-'+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)); }
+function operationV2(scope,payload) {
+  const key='pot-v2:'+scope, serialized=JSON.stringify(payload);
+  let old;try{old=JSON.parse(localStorage.getItem(key)||'null');}catch(e){}
+  if(old&&old.serialized===serialized)return old.id;
+  const id=uidV2();localStorage.setItem(key,JSON.stringify({id,serialized}));return id;
+}
+function completedV2(scope) { localStorage.removeItem('pot-v2:'+scope); }
+async function checkedV2(name,args) {
+  const r=await callV2(name,args||[]);
+  if(!r||!r.success){const e=new Error(r&&r.error||'伺服器未回傳有效結果');e.response=r;throw e;}
+  return r;
+}
+const costV2={ready:false,busy:false,dirty:false,id:'',savedTotal:null,models:[],params:[],items:[],potSku:'',ticket:0};
+function costNoticeV2(message,error) {
+  let el=document.getElementById('costNoticeV2');
+  if(!el){el=document.createElement('div');el.id='costNoticeV2';document.getElementById('costPage').prepend(el);}
+  el.textContent=message;el.style.cssText='padding:12px;margin-bottom:12px;border-radius:8px;background:'+(error?'#fdecea':'#e8f5ec')+';color:#333';
+}
+function setupCostV2() {
+  const page=document.getElementById('costPage');
+  const old=document.getElementById('costModelNote');
+  if(old&&old.tagName!=='TEXTAREA'){
+    const area=document.createElement('textarea');area.id=old.id;area.value=old.value;area.rows=3;area.placeholder='例如：2026/09 原售價 $500；本次調整為 $550';
+    area.style.cssText='width:100%;padding:12px;font:inherit';old.replaceWith(area);
+  }
+  const oldSave=page.querySelector('[onclick="saveCostModel()"]');
+  if(oldSave){
+    oldSave.parentElement.style.display='grid';
+    oldSave.parentElement.style.gridTemplateColumns='repeat(auto-fit,minmax(130px,1fr))';
+    oldSave.parentElement.style.gap='10px';
+    oldSave.id='saveCostV2';oldSave.textContent=costV2.id?'更新此紀錄':'儲存新紀錄';
+    if(!document.getElementById('saveAsCostV2')){
+      const b=document.createElement('button');b.id='saveAsCostV2';b.className='btn btn-gray';b.textContent='另存新型號';b.onclick=()=>saveCostModel(true);
+      oldSave.parentElement.appendChild(b);
+    }
+  }
+  if(!page.dataset.v2bound){
+    page.dataset.v2bound='1';
+    page.addEventListener('input',e=>{
+      if(e.target.id==='costModelSearch')return;
+      costV2.dirty=true;
+      if(e.target.id==='costPotName'||e.target.id==='costPotPrice'){
+        costV2.potSku='';document.getElementById('costPotSelect').value='';
+      }
+      if(e.target.type==='number'&&costV2.ready)calcCost();
+    });
+  }
+  if(!document.getElementById('refreshCostV2')){
+    const b=document.createElement('button');b.id='refreshCostV2';b.className='btn btn-gray btn-sm';b.textContent='重新載入最新單價';
+    b.onclick=()=>initCostPage(true);page.prepend(b);
+  }
+}
+function costButtonsV2() {
+  const page=document.getElementById('costPage');
+  page.querySelectorAll('#saveCostV2,#saveAsCostV2,[onclick="calcCost()"]').forEach(b=>b.disabled=!costV2.ready||costV2.busy);
+  const b=document.getElementById('saveCostV2');if(b)b.textContent=costV2.id?'更新此紀錄':'儲存新紀錄';
+}
+async function initCostPage(force) {
+  setupCostV2();
+  if(costV2.ready&&!force){costButtonsV2();return;}
+  if(force&&costV2.dirty&&!confirm('重新載入會清除尚未儲存的編輯，確定繼續？'))return;
+  const ticket=++costV2.ticket;costV2.ready=false;costButtonsV2();costNoticeV2('載入材料、盆器及型號中，完成前不能儲存。');
+  try{
+    const r=await checkedV2('getCostContext');
+    if(ticket!==costV2.ticket)return;
+    if(!Array.isArray(r.params)||!Array.isArray(r.items)||!Array.isArray(r.models))throw new Error('資料格式不完整');
+    const names=new Set();
+    r.params.forEach(p=>{
+      if(!p.name||names.has(p.name)||!Number.isFinite(Number(p.price))||Number(p.price)<0)throw new Error('成本參數有重複名称或無效單價：'+p.name);
+      names.add(p.name);
+    });
+    costV2.params=r.params;costV2.items=r.items;costV2.models=r.models;
+    bambooSizes=r.params.filter(p=>p.name.startsWith('開運竹'));
+    accessories=r.params.filter(p=>!p.name.startsWith('開運竹'));
+    buildBambooGrid();buildAccGrid();loadPotsForCost();
+    costV2.ready=true;clearCost(true);renderCostModelList(r.models);
+    costNoticeV2('依目前材料單價試算；按儲存才會更新紀錄。客人自備盆器可留空（金額 0）。');
+  }catch(e){costNoticeV2('載入失敗：'+e.message,true);}
+  costButtonsV2();
+}
+function buildBambooGrid() {
+  document.getElementById('bambooGrid').innerHTML=bambooSizes.map((b,i)=>'<div class="bamboo-cell"><label>'+escapeV2(b.name.replace('開運竹',''))+'</label><div class="bhint">$'+Number(b.price)+'／'+escapeV2(b.unit)+'</div><input type="number" id="cb'+i+'" min="0" step="1" value="0" inputmode="numeric"></div>').join('');
+}
+function buildAccGrid() {
+  document.getElementById('accGrid').innerHTML=accessories.map((a,i)=>'<div class="acc-item"><label>'+escapeV2(a.name)+'<br><span class="acc-hint">$'+Number(a.price)+'／'+escapeV2(a.unit)+'</span></label><input type="number" id="ac'+i+'" min="0" step="1" value="0" inputmode="numeric"></div>').join('');
+}
+function loadPotsForCost() {
+  document.getElementById('costPotSelect').innerHTML='<option value="">— 客人自備／手動金額 —</option>'+costV2.items.map((p,i)=>'<option value="'+i+'">'+escapeV2(p.name+' / '+p.color+'（'+p.vendor+'，$'+p.price+'）')+'</option>').join('');
+}
+function onCostPotSelect() {
+  const value=document.getElementById('costPotSelect').value;
+  const p=value===''?null:costV2.items[Number(value)];
+  costV2.potSku=p?p.sku:'';
+  document.getElementById('costPotName').value=p?p.name+' / '+p.color:'';
+  document.getElementById('costPotPrice').value=p?p.price:'';
+  costV2.dirty=true;calcCost();
+}
+function costNumberV2(value,label,integer) {
+  const n=value===''?0:Number(value);
+  if(!Number.isFinite(n)||n<0||(integer&&!Number.isInteger(n)))throw new Error(label+(integer?'請填非負整數':'請填非負金額'));
+  return n;
+}
+function costDataV2() {
+  if(!costV2.ready)throw new Error('成本資料尚未載入完成');
+  const list=(params,prefix)=>params.map((p,i)=>({name:p.name,price:Number(p.price),qty:costNumberV2(document.getElementById(prefix+i).value,p.name,true)})).filter(x=>x.qty>0);
+  const bamboo=list(bambooSizes,'cb'),accData=list(accessories,'ac');
+  const potPrice=costNumberV2(document.getElementById('costPotPrice').value,'盆器金額',false);
+  return {id:costV2.id,name:document.getElementById('costModelName').value.trim(),note:document.getElementById('costModelNote').value.trim(),bamboo,accData,potSku:costV2.potSku,potName:document.getElementById('costPotName').value.trim(),potPrice,total:Math.round((bamboo.concat(accData).reduce((s,x)=>s+x.price*x.qty,0)+potPrice)*100)/100};
+}
+function calcCost() {
+  try{
+    const d=costDataV2();
+    document.getElementById('costResult').style.display='block';
+    document.getElementById('costTotal').textContent=d.total.toLocaleString('zh-TW',{maximumFractionDigits:2});
+    const detail=d.bamboo.concat(d.accData).map(x=>({label:x.name+' × '+x.qty+'（單價 $'+x.price+'）',value:x.qty*x.price}));
+    if(d.potPrice||d.potName)detail.push({label:d.potName||'盆器',value:d.potPrice});
+    document.getElementById('costBreakdown').innerHTML=detail.map(x=>'<div class="bk-row"><span>'+escapeV2(x.label)+'</span><b>$'+Number(x.value.toFixed(2))+'</b></div>').join('');
+    costNoticeV2(costV2.savedTotal==null?'依目前單價試算，尚未儲存。':'已存成本 $'+costV2.savedTotal+' → 本次試算 $'+d.total+'；按「更新此紀錄」才儲存。');
+    return d;
+  }catch(e){document.getElementById('costResult').style.display='none';costNoticeV2(e.message,true);return null;}
+}
+async function loadCostModels() {
+  try{const r=await checkedV2('getCostModels');costV2.models=r.models;renderCostModelList(r.models);}catch(e){costNoticeV2(e.message,true);}
+}
+function renderCostModelList(models) {
+  const el=document.getElementById('costModelList'),kwEl=document.getElementById('costModelSearch');
+  const kw=kwEl?kwEl.value.trim().toLowerCase():'';
+  const list=(models||[]).filter(m=>!kw||(m.name+' '+m.note).toLowerCase().includes(kw));
+  el.innerHTML=list.length?list.map(m=>'<div class="model-item" data-model-id="'+escapeV2(m.id)+'"><div style="flex:1;min-width:0"><div class="m-name">'+escapeV2(m.name)+'</div><div class="m-sub">最後儲存：'+escapeV2(m.updatedAt)+'</div><div style="white-space:pre-wrap;overflow-wrap:anywhere;margin-top:8px">'+escapeV2(m.note)+'</div></div><div><div class="m-sub">已存成本</div><div class="m-cost">$'+Number(m.total)+'</div><button class="btn btn-red btn-sm" data-delete-id="'+escapeV2(m.id)+'">刪除</button></div></div>').join(''):'<div class="empty-state">沒有符合的型號</div>';
+  el.querySelectorAll('[data-model-id]').forEach(x=>x.onclick=()=>loadCostModel(x.dataset.modelId));
+  el.querySelectorAll('[data-delete-id]').forEach(x=>x.onclick=e=>{e.stopPropagation();confirmDeleteModel(x.dataset.deleteId);});
+}
+function filterCostModels(){renderCostModelList(costV2.models);}
+async function loadCostModel(id) {
+  if(costV2.busy)return;
+  if(costV2.dirty&&!confirm('目前有未儲存編輯，確定開啟其他紀錄？'))return;
+  costV2.ready=false;costButtonsV2();
+  try{
+    const context=await checkedV2('getCostContext'),m=context.models.find(x=>x.id===id);
+    if(!m)throw new Error('型號已被刪除，請重新載入');
+    const oldMaterials=(m.bamboo||[]).concat(m.accData||[]);
+    const missing=oldMaterials.filter(x=>!context.params.some(p=>p.name===x.name));
+    if(missing.length)throw new Error('找不到原材料：'+missing.map(x=>x.name).join('、')+'。不會以 0 計算，請先核對成本參數。');
+    context.params.forEach(p=>{if(!Number.isFinite(Number(p.price))||Number(p.price)<0)throw new Error('材料單價錯誤：'+p.name);});
+    costV2.params=context.params;costV2.items=context.items;costV2.models=context.models;
+    bambooSizes=context.params.filter(p=>p.name.startsWith('開運竹'));accessories=context.params.filter(p=>!p.name.startsWith('開運竹'));
+    buildBambooGrid();buildAccGrid();loadPotsForCost();
+    document.getElementById('costModelName').value=m.name;document.getElementById('costModelNote').value=m.note||'';
+    [ [bambooSizes,m.bamboo,'cb'],[accessories,m.accData,'ac'] ].forEach(([params,list,prefix])=>list.forEach(x=>{const i=params.findIndex(p=>p.name===x.name);if(i>=0)document.getElementById(prefix+i).value=x.qty;}));
+    costV2.id=m.id;costV2.savedTotal=m.total;costV2.potSku=m.potSku||'';
+    let pot=null;
+    if(m.potSku){pot=context.items.find(p=>p.sku===m.potSku);if(!pot)throw new Error('原庫存盆器已找不到；請先核對，不能直接視為免費');}
+    document.getElementById('costPotName').value=pot?pot.name+' / '+pot.color:m.potName||'';
+    document.getElementById('costPotPrice').value=pot?pot.price:m.potPrice||0;
+    if(pot)document.getElementById('costPotSelect').value=context.items.indexOf(pot);
+    costV2.ready=true;costV2.dirty=false;calcCost();renderCostModelList(context.models);
+    if(!m.potSku&&m.potName)costNoticeV2('已依最新材料單價試算。此紀錄未連結盆器 SKU，盆器保留手動金額；若要追蹤現價，請重新選取庫存盆器。');
+    const page=document.getElementById('costPage');page.scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){costNoticeV2(e.message,true);}
+  costButtonsV2();
+}
+async function saveCostModel(asNew) {
+  if(costV2.busy)return;
+  const d=calcCost();if(!d)return;
+  if(asNew===true){
+    const name=prompt('另存的新名稱（原紀錄不變）',d.name+'－新紀錄');
+    if(!name||!name.trim())return;d.name=name.trim();d.id='';
+  }
+  if(!d.name){alert('請輸入名稱');return;}
+  if(d.id&&!confirm('更新「'+d.name+'」的成本、備註及儲存日期？'))return;
+  d.requestId=operationV2('cost-save',d);costV2.busy=true;costButtonsV2();
+  try{
+    const r=await checkedV2('saveCostModel',[d]);completedV2('cost-save');
+    costV2.id=r.id;costV2.savedTotal=r.total;costV2.dirty=false;
+    document.getElementById('costModelName').value=d.name;
+    await loadCostModels();costNoticeV2('已儲存「'+d.name+'」，成本 $'+r.total+'。');
+  }catch(e){costNoticeV2('儲存未完成：'+e.message+'；內容保留，請先確認後重試。',true);}
+  finally{costV2.busy=false;costButtonsV2();}
+}
+async function confirmDeleteModel(id) {
+  if(costV2.busy)return;const m=costV2.models.find(m=>m.id===id);if(!m)return;
+  if(!confirm('確定刪除「'+m.name+'」？'))return;
+  costV2.busy=true;costButtonsV2();const requestId=operationV2('cost-delete',{id});
+  try{await checkedV2('deleteCostModel',[id,requestId]);completedV2('cost-delete');if(costV2.id===id)clearCost(true);await loadCostModels();}
+  catch(e){costNoticeV2('刪除未確認：'+e.message,true);}
+  finally{costV2.busy=false;costButtonsV2();}
+}
+function clearCost(force) {
+  if(!force&&costV2.dirty&&!confirm('確定清除尚未儲存內容？'))return;
+  ['costModelName','costModelNote','costPotName','costPotPrice','costPotSelect'].forEach(id=>{document.getElementById(id).value='';});
+  bambooSizes.forEach((_,i)=>{const el=document.getElementById('cb'+i);if(el)el.value=0;});
+  accessories.forEach((_,i)=>{const el=document.getElementById('ac'+i);if(el)el.value=0;});
+  costV2.id='';costV2.potSku='';costV2.savedTotal=null;costV2.dirty=false;
+  document.getElementById('costResult').style.display='none';costButtonsV2();
+}
+window.addEventListener('beforeunload',e=>{if(costV2.dirty){e.preventDefault();e.returnValue='';}});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button[onclick*="switchPage"]');
+  if(b&&costV2.dirty&&document.getElementById('costPage').classList.contains('active')&&!b.getAttribute('onclick').includes("'costPage'")){
+    if(!confirm('有未儲存的成本編輯，確定離開？內容會暫留，但重新整理將遺失。')){e.stopImmediatePropagation();e.preventDefault();}
+  }
+},true);
+
+
+function callV2(name,args) {
+  if(name==='saveCostModel')return apiPost(name,{data:args[0]});
+  if(name==='deleteCostModel')return apiPost(name,{id:args[0],requestId:args[1]});
+  if(name==='cancelStockOut')return apiPost(name,{outId:args[0],requestId:args[1]});
+  return apiGet(name);
+}
+async function apiPost(action,data) {
+  if(!API_URL)throw new Error('請先設定 API 網址');
+  const response=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...data})});
+  if(!response.ok)throw new Error('HTTP '+response.status);
+  return response.json();
+}
+let logBusyV2=false,logTicketV2=0,lastLogSuccessV2='';
+function startLogPolling() { stopLogPolling();_logTimer=setInterval(()=>{if(!document.hidden)loadLog();},5000); }
+function stopLogPolling() { if(_logTimer)clearInterval(_logTimer);_logTimer=null;++logTicketV2; }
+async function loadLog() {
+  if(logBusyV2)return;logBusyV2=true;
+  const ticket=++logTicketV2,status=document.getElementById('logStatus');
+  status.textContent='更新中…';
+  try{
+    // 使用台北日期，不依手機旅遊時所在時區
+    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+    const p=Object.fromEntries(parts.map(x=>[x.type,x.value])),date=p.year+'/'+p.month+'/'+p.day;
+    const r=await apiGet('getStockLog&date='+encodeURIComponent(date));
+    if(!r||!r.success||!Array.isArray(r.items))throw new Error(r&&r.error||'回傳紀錄格式不完整');
+    if(ticket!==logTicketV2)return;
+    renderLog(r.items.filter(i=>i.type==='出庫'||i.type==='取消出庫'),date);
+    lastLogSuccessV2=new Date().toLocaleTimeString('zh-TW');
+    status.textContent='更新於 '+lastLogSuccessV2;status.style.color='#555';
+  }catch(e){
+    if(ticket===logTicketV2){
+      status.textContent='⚠ 未更新'+(lastLogSuccessV2?'（最後成功 '+lastLogSuccessV2+'）':'')+'：'+e.message;
+      status.style.color='#c0392b';document.getElementById('latestCard').style.display='none';
+    }
+  }finally{logBusyV2=false;}
+}
+
+function itemTitleV3(i){return String(i.name||'')+(i.color?' / '+i.color:'');}
+function groupOutLogsV3(items) {
+  const linked=new Set(items.filter(i=>i.type==='取消出庫'&&i.originalOutId).map(i=>i.originalOutId));
+  const groups=new Map(),other=[];
+  const sorted=items.slice().sort((a,b)=>(b.date+' '+b.time).localeCompare(a.date+' '+a.time)||(b._row||0)-(a._row||0));
+  for(const i of sorted){
+    if((i.type==='取消出庫'&&i.originalOutId)||(i.type==='出庫'&&(i.cancelled||linked.has(i.outId))))continue;
+    const key=JSON.stringify([String(i.date||'').replace(/-/g,'/'),i.sku||i.barcode||[i.name,i.color,i.vendor,i.vendorCode]]);
+    if(i.type!=='出庫'&&i.type!=='取消出庫'){other.push(i);continue;}
+    if(!groups.has(key))groups.set(key,{...i,type:'出庫',qty:0,canCancel:false,outId:'',legacy:false});
+    const g=groups.get(key);
+    if(i.type==='取消出庫'){
+      if(!i.originalOutId)g.qty-=Number(i.qty)||0;
+      continue;
+    }
+    if(i.cancelled||linked.has(i.outId))continue;
+    g.qty+=Number(i.qty)||0;g.legacy=g.legacy||i.legacy;
+    if(!g.canCancel&&i.canCancel&&i.outId){g.outId=i.outId;g.canCancel=true;}
+  }
+  return [...other,...[...groups.values()].filter(g=>g.qty>0)].sort((a,b)=>(b.date+' '+b.time).localeCompare(a.date+' '+a.time)||(b._row||0)-(a._row||0));
+}
+function renderLog(items,dateStr) {
+  const sorted=groupOutLogsV3(items||[]).filter(i=>i.type==='出庫');
+  const latest=sorted[0],card=document.getElementById('latestCard'),list=document.getElementById('logList');
+  card.style.display=latest?'block':'none';
+  if(latest){
+    document.getElementById('latestName').textContent=itemTitleV3(latest);
+    document.getElementById('latestMeta').textContent=latest.vendor+'　貨號：'+latest.vendorCode+'　當日淨出庫：'+latest.qty+' 個';
+    document.getElementById('latestTime').textContent=latest.date+'　'+latest.time;
+  }
+  document.getElementById('logTotal').textContent=dateStr+' 淨出庫 '+sorted.reduce((s,x)=>s+x.qty,0)+' 個';
+  list.innerHTML=sorted.map(i=>'<article style="padding:16px;margin:12px 0;border:1px solid #ddd;border-left:4px solid #a85a22;border-radius:10px"><div style="display:flex;justify-content:space-between;gap:12px"><b>'+escapeV2(itemTitleV3(i))+'</b><strong style="white-space:nowrap">出庫 '+i.qty+' 個</strong></div><div>'+escapeV2(i.vendor+'　'+i.vendorCode)+'</div><div style="font-size:13px;color:#666">'+escapeV2(i.date)+' 當日合計</div>'+(i.canCancel?'<button class="btn btn-gray btn-sm" style="margin-top:10px" data-out-id="'+escapeV2(i.outId)+'">↩ 取消 1 個</button>':i.legacy?'<small>舊紀錄需人工核對後調整</small>':'')+'</article>').join('')||'沒有未取消的出庫記錄';
+  list.querySelectorAll('[data-out-id]').forEach(b=>b.onclick=()=>cancelLog(b.dataset.outId,b));
+}
+let cancelBusyV2=false;
+async function cancelLog(outId,btn) {
+  if(cancelBusyV2)return;
+  if(!confirm('取消這筆出庫，補回原品項 1 個並還原該次成本？'))return;
+  cancelBusyV2=true;btn.disabled=true;const requestId=operationV2('cancel:'+outId,{outId});
+  try{await checkedV2('cancelStockOut',[outId,requestId]);completedV2('cancel:'+outId);await loadLog();}
+  catch(e){alert('取消尚未確認：'+e.message+'；請使用同一筆重試，不要另取消其他筆。');}
+  finally{cancelBusyV2=false;btn.disabled=false;}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.getElementById('logPage').classList.contains('active'))loadLog();});
+
+
+async function loadStock() {
+  const list=document.getElementById('stockList');list.textContent='載入中…';
+  let status=document.getElementById('stockStatusV2');
+  if(!status){
+    const wrap=document.createElement('div');status=document.createElement('span');status.id='stockStatusV2';
+    const b=document.createElement('button');b.className='btn btn-gray btn-sm';b.textContent='更新庫存';b.onclick=loadStock;
+    wrap.append(status,b);list.before(wrap);
+  }
+  try{
+    const r=await apiGet('getItems');
+    if(!r||!r.success||!Array.isArray(r.items))throw new Error(r&&r.error||'資料格式不完整');
+    allItems=r.items;filterStock();status.textContent='更新於 '+new Date().toLocaleTimeString('zh-TW')+'　';
+  }catch(e){allItems=[];list.textContent='載入失敗：'+e.message;status.textContent='⚠ 庫存未更新　';}
+}
+function renderStock(items) {
+  document.getElementById('stockList').innerHTML=items.length?items.map(i=>'<div class="stock-item'+(i.isLow?' low':'')+'"><div style="min-width:0"><div class="si-name">'+escapeV2(i.name+' / '+i.color)+'</div><div class="si-sub">'+escapeV2(i.vendor+'　貨號：'+i.vendorCode)+'　$'+Number(i.price)+'</div></div><div><div class="si-num">'+Number(i.stock)+'</div><div class="si-min">警示：'+Number(i.minStock)+'</div></div></div>').join(''):'沒有找到品項';
+}
+
+</script>
+</body>
+</html>
