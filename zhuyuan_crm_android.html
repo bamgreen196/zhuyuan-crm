@@ -363,7 +363,10 @@ body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Noto
   <div class="modal">
     <div class="modal-title">輸入客製金額</div>
     <div style="font-size:14px;color:var(--ink2);margin-bottom:12px;">品項：<span id="custom-price-name" style="font-weight:500;"></span></div>
-    <input class="modal-input" id="custom-price-input" type="number" placeholder="輸入金額，例如 450" inputmode="numeric" />
+    <label class="settings-label" for="custom-display-name">顯示名稱（選填）</label>
+    <input class="modal-input" id="custom-display-name" type="text" maxlength="30" placeholder="例如：兩層素材、大五福" autocomplete="off" />
+    <label class="settings-label" for="custom-price-input">金額</label>
+    <input class="modal-input" id="custom-price-input" type="number" min="1" step="1" placeholder="輸入金額，例如 500" inputmode="numeric" />
     <div style="display:flex;align-items:center;gap:12px;margin:8px 0;">
       <label style="font-size:14px;color:var(--ink2);white-space:nowrap;">數量：</label>
       <div style="display:flex;align-items:center;gap:8px;">
@@ -820,12 +823,13 @@ function adjustCustomQty(delta) {
 
 function openCustomPrice(cat, name) {
   document.getElementById('custom-price-name').textContent = name;
+  document.getElementById('custom-display-name').value = '';
   document.getElementById('custom-price-input').value = '';
   document.getElementById('modal-custom-price').dataset.cat = cat;
   document.getElementById('modal-custom-price').dataset.name = name;
   document.getElementById('custom-qty-display').textContent = '1';
   document.getElementById('modal-custom-price').classList.remove('hidden');
-  setTimeout(() => document.getElementById('custom-price-input').focus(), 100);
+  setTimeout(() => document.getElementById('custom-display-name').focus(), 100);
 }
 
 function submitCustomPrice() {
@@ -833,19 +837,17 @@ function submitCustomPrice() {
   if (!price || price <= 0) { alert('請輸入有效金額'); return; }
   const cat  = document.getElementById('modal-custom-price').dataset.cat;
   const name = document.getElementById('modal-custom-price').dataset.name;
-  const key  = cat + '|' + name;
+  // 顯示名稱只用於這筆客製品項，不更動 Sheet 的商品名稱。
+  const customName = document.getElementById('custom-display-name').value.trim().replace(/[<>]/g, '');
+  const displayName = customName ? name + '（' + customName + '）' : name + '（$' + price + '）';
   closeModal('modal-custom-price');
-  if (!cart[key]) {
-    cart[key] = { name, price, qty: 0, category: cat };
-  }
-  // 每次按+都用新輸入的金額新增一筆（允許同品名不同價格）
-  const uniqueKey = cat + '|' + name + '|' + price;
+  // 名稱或價格不同時各自成為一筆；完全相同時合併數量。
+  const uniqueKey = JSON.stringify([cat, name, customName, price]);
   if (!cart[uniqueKey]) {
-    cart[uniqueKey] = { name: name + '（$' + price + '）', price, qty: 0, category: cat };
+    cart[uniqueKey] = { name: displayName, price, qty: 0, category: cat };
   }
   const qty = parseInt(document.getElementById('custom-qty-display').textContent) || 1;
   cart[uniqueKey].qty += qty;
-  delete cart[key]; // 移除無價格的佔位
   renderProductGrid();
   updateBottomBar();
 }
