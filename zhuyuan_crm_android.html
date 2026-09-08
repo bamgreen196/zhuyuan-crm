@@ -49,6 +49,10 @@ body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Noto
 /* ── Customer List ── */
 .customer-search { width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 15px; background: var(--surface); color: var(--ink); margin-bottom: 10px; }
 .customer-search:focus { outline: none; border-color: var(--green-light); }
+.pricing-mode { display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff8e8;border:1px solid #ead5a4;border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:12px; }
+.pricing-mode-text b { display:block;font-size:15px;color:#7a4700; }.pricing-mode-text span { display:block;font-size:12px;color:#906d37;margin-top:2px; }
+.mode-switch { position:relative;width:50px;height:30px;border:0;border-radius:18px;background:#cbd5ce;padding:3px;flex:none; }.mode-switch::after { content:'';display:block;width:24px;height:24px;border-radius:50%;background:#fff;transition:.18s;box-shadow:0 1px 3px #0003; }.mode-switch.on { background:#d68a19; }.mode-switch.on::after { transform:translateX(20px); }
+.bargain-badge { display:inline-block;background:#fff0d6;color:#965600;border-radius:14px;padding:4px 9px;font-size:12px;font-weight:700;margin-bottom:8px; }
 .customer-list { display: flex; flex-direction: column; gap: 8px; }
 .customer-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: border-color .2s, box-shadow .2s; }
 .customer-card:active { background: var(--surface2); }
@@ -94,6 +98,12 @@ body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Noto
 .cart-total-label { font-size: 13px; color: var(--ink3); }
 .cart-total-amount { font-size: 22px; font-weight: 700; color: var(--green); font-family: 'Noto Serif TC', serif; }
 .cart-total-qty { font-size: 12px; color: var(--ink3); }
+.discount-editor { margin: -4px 16px 10px; padding: 10px 12px; background: #F7FBF7; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
+.discount-editor label { display: flex; align-items: center; gap: 8px; color: var(--ink2); }
+.discount-editor input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--green); }
+.discount-editor input[type="number"] { width: 96px; padding: 8px; border: 1px solid var(--border2); border-radius: 7px; font-size: 16px; text-align: right; }
+.discount-result { margin-top: 8px; display: flex; justify-content: space-between; color: var(--green); font-weight: 700; }
+.receipt-discount-row { display: flex; justify-content: space-between; padding: 2px 0 7px 12px; color: var(--red); font-size: 12px; border-bottom: 1px dashed var(--border); }
 
 /* ── Buttons ── */
 .btn { width: 100%; padding: 14px; border: none; border-radius: var(--radius); font-size: 16px; font-weight: 700; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; }
@@ -200,6 +210,10 @@ body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Noto
       <div id="step0" class="step-pane">
         <div class="section">
           <div class="section-label">選擇客戶</div>
+          <div class="pricing-mode">
+            <div class="pricing-mode-text"><b>議價模式</b><span>開啟後輸入每盆成交價，不使用自取優惠</span></div>
+            <button type="button" id="bargain-mode-switch" class="mode-switch" aria-label="議價模式" aria-pressed="false" onclick="toggleBargainMode()"></button>
+          </div>
           <input class="customer-search" id="customer-search" type="text" placeholder="搜尋客戶名稱..." oninput="filterCustomers()" />
           <div class="customer-list" id="customer-list"></div>
           <div style="height:10px;"></div>
@@ -409,6 +423,7 @@ let orderBeforeReprint = null;
 let isSavingOrder = false;
 let historySearchOpened = false;
 let historyPeriod = 'all';
+let bargainingMode = false;
 
 // ── 離線佇列（B方案）──
 const QUEUE_KEY = 'zhuOrderQueue';
@@ -588,6 +603,9 @@ function restoreOrderAfterReprint() {
   currentCustomer = draft.customer;
   savedOrder = draft.savedOrder;
   currentCategory = draft.category;
+  bargainingMode = !!draft.bargainingMode;
+  document.getElementById('bargain-mode-switch').classList.toggle('on', bargainingMode);
+  document.getElementById('bargain-mode-switch').setAttribute('aria-pressed', String(bargainingMode));
   if (draft.step === 1) renderCategories();
   if (draft.step === 2) renderCartReview();
   if (draft.step === 3) {
@@ -627,6 +645,14 @@ function filterCustomers() {
 function selectCustomer(id) {
   currentCustomer = customers.find(c => c.id === id);
   renderCustomers(document.getElementById('customer-search').value);
+  updateBottomBar();
+}
+
+function toggleBargainMode() {
+  bargainingMode = !bargainingMode;
+  const button = document.getElementById('bargain-mode-switch');
+  button.classList.toggle('on', bargainingMode);
+  button.setAttribute('aria-pressed', String(bargainingMode));
   updateBottomBar();
 }
 
@@ -792,7 +818,7 @@ function adjustProductQty(cat, name, price, delta) {
     return;
   }
   if (!cart[key] && delta > 0) {
-    cart[key] = { name, price, qty: 0, category: cat };
+    cart[key] = { name, price, qty: 0, category: cat, pricingMode: bargainingMode && cat !== '客製' ? 'bargain' : 'regular', dealPrice: price };
   }
   if (!cart[key]) return;
   cart[key].qty += delta;
@@ -808,7 +834,7 @@ function openQtyInput(cat, name, price) {
   const n = parseInt(qty);
   if (!n || n <= 0) { alert('請輸入有效數量'); return; }
   const key = cat + '|' + name;
-  if (!cart[key]) cart[key] = { name, price, qty: 0, category: cat };
+  if (!cart[key]) cart[key] = { name, price, qty: 0, category: cat, pricingMode: bargainingMode && cat !== '客製' ? 'bargain' : 'regular', dealPrice: price };
   cart[key].qty += n;
   renderProductGrid();
   updateBottomBar();
@@ -844,7 +870,7 @@ function submitCustomPrice() {
   // 名稱或價格不同時各自成為一筆；完全相同時合併數量。
   const uniqueKey = JSON.stringify([cat, name, customName, price]);
   if (!cart[uniqueKey]) {
-    cart[uniqueKey] = { name: displayName, price, qty: 0, category: cat };
+    cart[uniqueKey] = { name: displayName, price, qty: 0, category: cat, pricingMode: 'regular', dealPrice: price };
   }
   const qty = parseInt(document.getElementById('custom-qty-display').textContent) || 1;
   cart[uniqueKey].qty += qty;
@@ -853,7 +879,7 @@ function submitCustomPrice() {
 }
 
 function cartTotal() {
-  return Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0);
+  return Object.values(cart).reduce((s, i) => s + itemNetSubtotal(i), 0);
 }
 function cartQty() {
   return Object.values(cart).reduce((s, i) => s + i.qty, 0);
@@ -862,22 +888,64 @@ function cartItems() {
   return Object.entries(cart).map(([k, v]) => Object.assign({}, v, { _key: k }));
 }
 
+function itemDiscountPerUnit(item) {
+  if (item.pricingMode === 'bargain') return 0;
+  const discount = Number(item.discountPerUnit) || 0;
+  return Math.max(0, Math.min(Number(item.price) || 0, discount));
+}
+function itemOriginalSubtotal(item) { return (Number(item.price) || 0) * (Number(item.qty) || 0); }
+function itemDiscountTotal(item) { return itemDiscountPerUnit(item) * (Number(item.qty) || 0); }
+function itemDealPrice(item) {
+  const price = Number(item.price) || 0;
+  if (item.pricingMode !== 'bargain' || item.category === '客製') return price;
+  return Math.max(0, Math.min(price, Number(item.dealPrice) >= 0 ? Number(item.dealPrice) : price));
+}
+function itemBargainTotal(item) { return (Number(item.price) - itemDealPrice(item)) * (Number(item.qty) || 0); }
+function itemNetSubtotal(item) {
+  return item.pricingMode === 'bargain' ? itemDealPrice(item) * (Number(item.qty) || 0) : itemOriginalSubtotal(item) - itemDiscountTotal(item);
+}
+function itemNetPrice(item) { return item.pricingMode === 'bargain' ? itemDealPrice(item) : (Number(item.price) || 0) - itemDiscountPerUnit(item); }
+function receiptAdjustmentHtml(item) {
+  if (item.pricingMode === 'bargain' && item.category !== '客製') return `<div class="receipt-discount-row"><span>議價成交（每盆 $${itemDealPrice(item)}）</span><span>省 $${itemBargainTotal(item).toLocaleString()}　實收 $${itemNetSubtotal(item).toLocaleString()}</span></div>`;
+  return itemDiscountTotal(item) > 0 ? `<div class="receipt-discount-row"><span>自取優惠（每盆折 $${itemDiscountPerUnit(item)}）</span><span>-$${itemDiscountTotal(item).toLocaleString()}　實收 $${itemNetSubtotal(item).toLocaleString()}</span></div>` : '';
+}
+function itemAdjustmentText(item) {
+  if (item.pricingMode === 'bargain' && item.category !== '客製') return `議價成交 每盆$${itemDealPrice(item)}  省$${itemBargainTotal(item)}  實收$${itemNetSubtotal(item)}`;
+  return itemDiscountTotal(item) > 0 ? `自取優惠 每盆-$${itemDiscountPerUnit(item)}  -$${itemDiscountTotal(item)}  實收$${itemNetSubtotal(item)}` : '';
+}
+
 // ── Cart Review ──
 function renderCartReview() {
   const items = cartItems();
   const review = document.getElementById('cart-review');
   review.innerHTML = items.map((item) => {
     const k = item._key;
+    const encodedKey = encodeURIComponent(k);
+    const hasDiscount = itemDiscountPerUnit(item) > 0;
+    const isBargain = item.pricingMode === 'bargain' && item.category !== '客製';
+    const canDiscount = !isBargain && item.category !== '客製';
     return `
     <div class="cart-row">
       <div class="cart-item-name">${item.name}</div>
       <div class="qty-ctrl">
-        <button class="qty-btn" onclick="adjustQty('${k}',-1)">−</button>
+        <button class="qty-btn" onclick="adjustQty(decodeURIComponent('${encodedKey}'),-1)">−</button>
         <div class="qty-num">${item.qty}</div>
-        <button class="qty-btn" onclick="adjustQty('${k}',1)">+</button>
+        <button class="qty-btn" onclick="adjustQty(decodeURIComponent('${encodedKey}'),1)">+</button>
       </div>
       <div class="cart-item-price">$${(item.price * item.qty).toLocaleString()}</div>
-    </div>`;
+    </div>
+    ${isBargain ? `<div class="discount-editor"><div class="bargain-badge">議價模式</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <label>每盆成交價 $<input type="number" min="0" max="${item.price}" step="1" value="${itemDealPrice(item)}" onchange="setItemDealPrice(decodeURIComponent('${encodedKey}'),this.value)" /></label>
+        <span>${item.qty}盆共省 $${itemBargainTotal(item).toLocaleString()}</span>
+      </div><div class="discount-result"><span>本項實收</span><span>$${itemNetSubtotal(item).toLocaleString()}</span></div>
+    </div>` : canDiscount ? `<div class="discount-editor">
+      <label><input type="checkbox" ${hasDiscount ? 'checked' : ''} onchange="toggleItemDiscount(decodeURIComponent('${encodedKey}'),this.checked)" />本品項使用自取優惠</label>
+      ${hasDiscount ? `<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;gap:10px;">
+        <label>每盆折價 $<input type="number" min="1" max="${item.price}" step="1" value="${itemDiscountPerUnit(item)}" onchange="setItemDiscount(decodeURIComponent('${encodedKey}'),this.value)" /></label>
+        <span>${item.qty}盆共折 $${itemDiscountTotal(item).toLocaleString()}</span>
+      </div><div class="discount-result"><span>本項實收</span><span>$${itemNetSubtotal(item).toLocaleString()}</span></div>` : ''}
+    </div>` : ''}`;
   }).join('');
 
   const total = cartTotal();
@@ -889,6 +957,28 @@ function renderCartReview() {
     <div>
       <div class="cart-total-amount">$${total.toLocaleString()}</div>
     </div>`;
+}
+
+function setItemDealPrice(key, value) {
+  if (!cart[key] || cart[key].pricingMode !== 'bargain' || cart[key].category === '客製') return;
+  cart[key].dealPrice = Math.max(0, Math.min(Number(cart[key].price) || 0, Math.floor(Number(value) || 0)));
+  renderCartReview();
+  updateBottomBar();
+}
+
+function toggleItemDiscount(key, enabled) {
+  if (!cart[key] || cart[key].category === '客製') return;
+  cart[key].discountPerUnit = enabled ? (Number(cart[key].discountPerUnit) || 0) : 0;
+  if (enabled && cart[key].discountPerUnit <= 0) cart[key].discountPerUnit = Math.min(20, cart[key].price);
+  renderCartReview();
+  updateBottomBar();
+}
+
+function setItemDiscount(key, value) {
+  if (!cart[key] || cart[key].category === '客製') return;
+  cart[key].discountPerUnit = Math.max(0, Math.min(Number(cart[key].price) || 0, Math.floor(Number(value) || 0)));
+  renderCartReview();
+  updateBottomBar();
 }
 
 function adjustQty(key, delta) {
@@ -913,7 +1003,8 @@ async function completeOrder() {
     customerName: currentCustomer.name,
     items: JSON.parse(JSON.stringify(items)),
     totalQty,
-    totalAmount
+    totalAmount,
+    pricingMode: bargainingMode ? 'bargain' : 'regular'
   };
 
   buildReceipt(totalQty, totalAmount);
@@ -928,22 +1019,19 @@ function reprintOrder(order) {
   if (!isReprintMode) {
     orderBeforeReprint = {
       cart: JSON.parse(JSON.stringify(cart)), customer: currentCustomer,
-      savedOrder, category: currentCategory, step: currentStep
+      savedOrder, category: currentCategory, step: currentStep, bargainingMode
     };
   }
-  // 從 detail 字串解析商品列表
+  // 新訂單優先使用結構化品項，舊訂單仍可從 detail 還原。
   // 格式：商品名 x數量($小計)、...
-  const items = [];
-  const parts = String(order.detail || '').split('、');
-  parts.forEach(function(part) {
-    const m = part.match(/^(.+?) x(\d+)\(\$(\d+)\)$/);
-    if (m) {
-      const qty = parseInt(m[2]);
-      const subtotal = parseInt(m[3]);
-      const price = Math.round(subtotal / qty);
-      items.push({ name: m[1], price: price, qty: qty });
-    }
-  });
+  const items = Array.isArray(order.items) && order.items.length
+    ? order.items.map(item => Object.assign({}, item))
+    : String(order.detail || '').split('、').map(function(part) {
+        const m = part.match(/^(.+?) x(\d+)\(\$(\d+)\)$/);
+        if (!m) return null;
+        const qty = parseInt(m[2]);
+        return { name: m[1], price: Math.round(parseInt(m[3]) / qty), qty: qty, discountPerUnit: 0 };
+      }).filter(Boolean);
 
   // 設定當前客戶
   // 歷史訂單的客戶只用於補印，不覆蓋尚未完成的新訂單。
@@ -974,8 +1062,9 @@ function buildReprintReceipt(order, items) {
           <span>${i.name}</span>
           <span style="color:var(--ink3);">${i.price}</span>
           <span style="color:var(--ink3);">x${i.qty}</span>
-          <span style="text-align:right;font-weight:500;">$${(i.price * i.qty).toLocaleString()}</span>
-        </div>`).join('')}
+          <span style="text-align:right;font-weight:500;">$${itemOriginalSubtotal(i).toLocaleString()}</span>
+        </div>
+        ${receiptAdjustmentHtml(i)}`).join('')}
       <div class="receipt-total-row">
         <span>共 ${totalQty} 盆</span>
         <span>$${totalAmount.toLocaleString()}</span>
@@ -1060,6 +1149,8 @@ async function doPrintReprint(items, dateStr, customerName, totalQty, totalAmt) 
     items.forEach(function(i) {
       drawLeft(String(i.name), FONT_SM, LINE_SM);
       drawRight('$' + i.price + ' x' + i.qty + ' = $' + (i.price * i.qty), FONT_SM, LINE_SM);
+      var adjustment = itemAdjustmentText(i);
+      if (adjustment) drawLeft(adjustment, FONT_SM, LINE_SM);
     });
     drawLine();
     drawLeft('共 ' + totalQty + ' 盆', FONT_MD, LINE_MD, true);
@@ -1133,8 +1224,9 @@ function buildReceipt(totalQty, totalAmount) {
       <span>${i.name}</span>
       <span style="color:var(--ink3);">${i.price}</span>
       <span style="color:var(--ink3);">x${i.qty}</span>
-      <span style="text-align:right;font-weight:500;">$${(i.price * i.qty).toLocaleString()}</span>
-    </div>`).join('');
+      <span style="text-align:right;font-weight:500;">$${itemOriginalSubtotal(i).toLocaleString()}</span>
+    </div>
+    ${receiptAdjustmentHtml(i)}`).join('');
 
   document.getElementById('receipt-wrap').innerHTML = `
     <div class="receipt-header">
@@ -1169,6 +1261,8 @@ function buildPrintArea(totalQty, totalAmount) {
   html += `<div class="ph"><span>商品</span><span>單價</span><span>數量</span><span>小計</span></div><div class="pd"></div>`;
   items.forEach(i => {
     html += `<div class="pr4"><span>${i.name}</span><span>${i.price}</span><span>x${i.qty}</span><span>${(i.price * i.qty).toLocaleString()}</span></div>`;
+    const adjustment = itemAdjustmentText(i);
+    if (adjustment) html += `<div class="pr"><span>${adjustment}</span><span></span></div>`;
   });
   html += `<div class="pt"><span>共${totalQty}盆</span><span>$${totalAmount.toLocaleString()}</span></div>`;
   document.getElementById('print-area').innerHTML = html;
@@ -1180,7 +1274,11 @@ function receiptText() {
   const dateStr = `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
   const items = cartItems();
   let lines = ['竹緣開運竹 結帳單', dateStr, `客戶：${currentCustomer.name}`, '---'];
-  items.forEach(i => lines.push(`${i.name} x${i.qty}  $${(i.price*i.qty).toLocaleString()}`));
+  items.forEach(i => {
+    lines.push(`${i.name} $${i.price} x${i.qty}  $${itemOriginalSubtotal(i).toLocaleString()}`);
+    const adjustment = itemAdjustmentText(i);
+    if (adjustment) lines.push('  ' + adjustment);
+  });
   lines.push('---');
   lines.push(`共${cartQty()}盆  總計 $${cartTotal().toLocaleString()}`);
   return lines.join('\n');
@@ -1209,6 +1307,8 @@ async function doPrint() {
       items.forEach(i => {
         window.printer.printText(i.name + '\n');
         window.printer.printText('  $' + i.price + ' x' + i.qty + ' = $' + (i.price*i.qty).toLocaleString() + '\n');
+        const adjustment = itemAdjustmentText(i);
+        if (adjustment) window.printer.printText('  ' + adjustment + '\n');
       });
       window.printer.printText('------------------------\n');
       window.printer.setAlignment(1);
@@ -1300,6 +1400,8 @@ async function doPrint() {
     items.forEach(function(i) {
       drawLeft(String(i.name), FONT_SM, LINE_SM, false);
       drawRight('$' + i.price + ' x' + i.qty + ' = $' + (i.price * i.qty), FONT_SM, LINE_SM, false);
+      var adjustment = itemAdjustmentText(i);
+      if (adjustment) drawLeft(adjustment, FONT_SM, LINE_SM, false);
     });
 
     drawLine();
@@ -1326,7 +1428,7 @@ async function doPrint() {
         } catch(e) {}
       } else if (navigator.share) {
         var text = '竹緣開運竹\n結帳單\n' + dateStr + '\n客戶：' + currentCustomer.name + '\n';
-        items.forEach(function(i) { text += i.name + ' x' + i.qty + ' $' + (i.price*i.qty) + '\n'; });
+        items.forEach(function(i) { var adjustment = itemAdjustmentText(i); text += i.name + ' x' + i.qty + ' $' + (i.price*i.qty) + (adjustment ? '\n' + adjustment : '') + '\n'; });
         text += '共' + totalQty + '盆 總計$' + totalAmt + '元';
         try { await navigator.share({ text: text }); } catch(e) {}
       }
@@ -1446,6 +1548,8 @@ async function shareReprintToLine(dateStr, customerName, items, totalQty, totalA
   items.forEach(function(i) {
     drawLeft(String(i.name), FONT_SM, LINE_SM);
     drawRight('$' + i.price + ' x' + i.qty + ' = $' + (i.price * i.qty), FONT_SM, LINE_SM);
+    var adjustment = itemAdjustmentText(i);
+    if (adjustment) drawLeft(adjustment, FONT_SM, LINE_SM);
   });
   drawLine();
   drawLeft('共 ' + totalQty + ' 盆', FONT_MD, LINE_MD, true);
@@ -1519,6 +1623,10 @@ function newOrder() {
   savedOrder = null;
   cart = {};
   currentCustomer = null;
+  bargainingMode = false;
+  const modeSwitch = document.getElementById('bargain-mode-switch');
+  modeSwitch.classList.remove('on');
+  modeSwitch.setAttribute('aria-pressed', 'false');
   document.getElementById('receipt-wrap').innerHTML = '';
   document.getElementById('print-area').innerHTML = '';
   document.getElementById('main-btn').style.display = 'block';
@@ -1832,3 +1940,4 @@ async function fetchCustomers() {
 </script>
 </body>
 </html>
+
