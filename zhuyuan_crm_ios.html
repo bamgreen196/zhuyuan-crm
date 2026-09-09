@@ -906,10 +906,10 @@ function itemDealPrice(item) {
   const price = Number(item.price) || 0;
   if (item.pricingMode !== 'bargain' || item.category === '客製') return price;
   const asking = itemAskingPrice(item);
-  return Math.max(0, Math.min(asking, Number(item.dealPrice) >= 0 ? Number(item.dealPrice) : asking));
+  return Math.max(0, Number(item.dealPrice) >= 0 ? Number(item.dealPrice) : asking);
 }
 function itemDisplaySubtotal(item) { return item.pricingMode === 'bargain' ? itemAskingPrice(item) * (Number(item.qty) || 0) : itemOriginalSubtotal(item); }
-function itemBargainTotal(item) { return (itemAskingPrice(item) - itemDealPrice(item)) * (Number(item.qty) || 0); }
+function itemBargainTotal(item) { return Math.max(0, itemAskingPrice(item) - itemDealPrice(item)) * (Number(item.qty) || 0); }
 function itemNetSubtotal(item) {
   return item.pricingMode === 'bargain' ? itemDealPrice(item) * (Number(item.qty) || 0) : itemOriginalSubtotal(item) - itemDiscountTotal(item);
 }
@@ -958,7 +958,7 @@ function renderCartReview() {
     ${isBargain ? `<div class="discount-editor"><div class="bargain-badge">議價模式</div>
       <div class="bargain-fields">
         <label>價格<input type="number" min="0" step="1" value="${itemAskingPrice(item)}" onchange="setItemAskingPrice(decodeURIComponent('${encodedKey}'),this.value)" /></label>
-        <label>成交價格<input type="number" min="0" max="${itemAskingPrice(item)}" step="1" value="${itemDealPrice(item)}" onchange="setItemDealPrice(decodeURIComponent('${encodedKey}'),this.value)" /></label>
+        <label>成交價格<input type="number" min="0" step="1" value="${itemDealPrice(item)}" onchange="setItemDealPrice(decodeURIComponent('${encodedKey}'),this.value)" /></label>
       </div><div class="discount-result"><span>折扣 -$${itemBargainTotal(item).toLocaleString()}</span><span>本項實收 $${itemNetSubtotal(item).toLocaleString()}</span></div>
     </div>` : canDiscount ? `<div class="discount-editor">
       <label><input type="checkbox" ${hasDiscount ? 'checked' : ''} onchange="toggleItemDiscount(decodeURIComponent('${encodedKey}'),this.checked)" />本品項使用自取優惠</label>
@@ -989,10 +989,7 @@ function setItemDealPrice(key, value) {
 
 function setItemAskingPrice(key, value) {
   if (!cart[key] || cart[key].pricingMode !== 'bargain' || cart[key].category === '客製') return;
-  const oldAsking = itemAskingPrice(cart[key]);
-  const oldDeal = Number(cart[key].dealPrice) || 0;
   cart[key].askingPrice = Math.max(0, Math.floor(Number(value) || 0));
-  if (oldDeal === oldAsking || oldDeal > cart[key].askingPrice) cart[key].dealPrice = cart[key].askingPrice;
   renderCartReview();
   updateBottomBar();
 }
