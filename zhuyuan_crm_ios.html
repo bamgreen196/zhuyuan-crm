@@ -917,15 +917,26 @@ function itemNetPrice(item) { return item.pricingMode === 'bargain' ? itemDealPr
 function receiptAdjustmentHtml(item) {
   if (item.pricingMode === 'bargain' && item.category !== '客製') return `<div class="receipt-discount-row"><span>折扣</span><span>-$${itemBargainTotal(item).toLocaleString()}</span></div>`;
   return itemDiscountTotal(item) > 0 ? `<div class="receipt-discount-row"><span>自取優惠（每盆折 $${itemDiscountPerUnit(item)}）</span><span>-$${itemDiscountTotal(item).toLocaleString()}　實收 $${itemNetSubtotal(item).toLocaleString()}</span></div>` : '';
+  const rows = itemPrintAdjustmentRows(item);
+  return rows.map(row => `<div class="receipt-discount-row"><span>${row.left}</span><span>${row.right}</span></div>`).join('');
 }
 function itemAdjustmentText(item) {
   return itemAdjustmentLines(item).join('\n');
 }
 function itemAdjustmentLines(item) {
+  return itemPrintAdjustmentRows(item).map(row => row.left ? row.left + '  ' + row.right : row.right);
+}
+function itemPrintAdjustmentRows(item) {
   if (item.pricingMode === 'bargain' && item.category !== '客製') return [`折扣  -$${itemBargainTotal(item)}`];
+  if (item.pricingMode === 'bargain' && item.category !== '客製') return [
+    { left: '折扣', right: '-$' + itemBargainTotal(item) },
+    { left: '', right: '實收 $' + itemNetSubtotal(item) }
+  ];
   return itemDiscountTotal(item) > 0 ? [
     `自取 每盆-$${itemDiscountPerUnit(item)}  共-$${itemDiscountTotal(item)}`,
     `實收$${itemNetSubtotal(item)}`
+    { left: '自取  每盆-$' + itemDiscountPerUnit(item), right: '共-$' + itemDiscountTotal(item) },
+    { left: '', right: '實收 $' + itemNetSubtotal(item) }
   ] : [];
 }
 
@@ -1175,6 +1186,7 @@ async function doPrintReprint(items, dateStr, customerName, totalQty, totalAmt) 
       drawLeft(String(i.name), FONT_SM, LINE_SM);
       drawRight('$' + itemAskingPrice(i) + ' x' + i.qty + ' = $' + itemDisplaySubtotal(i), FONT_SM, LINE_SM);
       itemAdjustmentLines(i).forEach(function(line) { drawLeft(line, FONT_SM, LINE_SM); });
+      itemPrintAdjustmentRows(i).forEach(function(row) { drawRow(row.left, row.right, FONT_SM, LINE_SM, false); });
     });
     drawLine();
     drawLeft('共 ' + totalQty + ' 盆', FONT_MD, LINE_MD, true);
@@ -1286,6 +1298,7 @@ function buildPrintArea(totalQty, totalAmount) {
   items.forEach(i => {
     html += `<div class="pr4"><span>${i.name}</span><span>${itemAskingPrice(i)}</span><span>x${i.qty}</span><span>${itemDisplaySubtotal(i).toLocaleString()}</span></div>`;
     itemAdjustmentLines(i).forEach(line => { html += `<div class="pr"><span>${line}</span><span></span></div>`; });
+    itemPrintAdjustmentRows(i).forEach(row => { html += `<div class="pr"><span>${row.left}</span><span>${row.right}</span></div>`; });
   });
   html += `<div class="pt"><span>共${totalQty}盆</span><span>$${totalAmount.toLocaleString()}</span></div>`;
   document.getElementById('print-area').innerHTML = html;
@@ -1422,6 +1435,7 @@ async function doPrint() {
       drawLeft(String(i.name), FONT_SM, LINE_SM, false);
       drawRight('$' + itemAskingPrice(i) + ' x' + i.qty + ' = $' + itemDisplaySubtotal(i), FONT_SM, LINE_SM, false);
       itemAdjustmentLines(i).forEach(function(line) { drawLeft(line, FONT_SM, LINE_SM, false); });
+      itemPrintAdjustmentRows(i).forEach(function(row) { drawRow(row.left, row.right, FONT_SM, LINE_SM, false); });
     });
 
     drawLine();
@@ -1569,6 +1583,7 @@ async function shareReprintToLine(dateStr, customerName, items, totalQty, totalA
     drawLeft(String(i.name), FONT_SM, LINE_SM);
     drawRight('$' + itemAskingPrice(i) + ' x' + i.qty + ' = $' + itemDisplaySubtotal(i), FONT_SM, LINE_SM);
     itemAdjustmentLines(i).forEach(function(line) { drawLeft(line, FONT_SM, LINE_SM); });
+    itemPrintAdjustmentRows(i).forEach(function(row) { drawRow(row.left, row.right, FONT_SM, LINE_SM, false); });
   });
   drawLine();
   drawLeft('共 ' + totalQty + ' 盆', FONT_MD, LINE_MD, true);
