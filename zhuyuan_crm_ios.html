@@ -100,9 +100,9 @@ body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Noto
 .cart-total-label { font-size: 13px; color: var(--ink3); }
 .cart-total-amount { font-size: 22px; font-weight: 700; color: var(--green); font-family: 'Noto Serif TC', serif; }
 .cart-total-qty { font-size: 12px; color: var(--ink3); }
-.discount-editor { margin: -4px 16px 10px; padding: 10px 12px; background: #F7FBF7; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
-.discount-editor label { display: flex; align-items: center; gap: 8px; color: var(--ink2); }
-.discount-editor input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--green); }
+.discount-editor { margin: -4px 0 12px; padding: 10px 12px; background: #F7FBF7; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; min-width:0; }
+.discount-editor label { display: flex; align-items: center; gap: 7px; color: var(--ink2); min-width:0; line-height:1.35; }
+.discount-editor input[type="checkbox"] { width: 20px; height: 20px; min-width:20px; margin:0; accent-color: var(--green); }
 .discount-editor input[type="number"] { width: 96px; padding: 8px; border: 1px solid var(--border2); border-radius: 7px; font-size: 16px; text-align: right; }
 .discount-result { margin-top: 8px; display: flex; justify-content: space-between; color: var(--green); font-weight: 700; }
 .receipt-discount-row { display: flex; justify-content: space-between; padding: 2px 0 7px 12px; color: var(--red); font-size: 12px; border-bottom: 1px dashed var(--border); }
@@ -213,7 +213,7 @@ body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Noto
         <div class="section">
           <div class="section-label">選擇客戶</div>
           <div class="pricing-mode">
-            <div class="pricing-mode-text"><b>議價模式</b><span>輸入每盆開價與成交價，不使用自取優惠</span></div>
+            <div class="pricing-mode-text"><b>議價模式</b><span>輸入價格與成交價格，不使用自取優惠</span></div>
             <button type="button" id="bargain-mode-switch" class="mode-switch" aria-label="議價模式" aria-pressed="false" onclick="toggleBargainMode()"></button>
           </div>
           <input class="customer-search" id="customer-search" type="text" placeholder="搜尋客戶名稱..." oninput="filterCustomers()" />
@@ -915,12 +915,18 @@ function itemNetSubtotal(item) {
 }
 function itemNetPrice(item) { return item.pricingMode === 'bargain' ? itemDealPrice(item) : (Number(item.price) || 0) - itemDiscountPerUnit(item); }
 function receiptAdjustmentHtml(item) {
-  if (item.pricingMode === 'bargain' && item.category !== '客製') return `<div class="receipt-discount-row"><span>開價 $${itemAskingPrice(item)}／成交 $${itemDealPrice(item)}</span><span>省 $${itemBargainTotal(item).toLocaleString()}　實收 $${itemNetSubtotal(item).toLocaleString()}</span></div>`;
+  if (item.pricingMode === 'bargain' && item.category !== '客製') return `<div class="receipt-discount-row"><span>折扣</span><span>-$${itemBargainTotal(item).toLocaleString()}</span></div>`;
   return itemDiscountTotal(item) > 0 ? `<div class="receipt-discount-row"><span>自取優惠（每盆折 $${itemDiscountPerUnit(item)}）</span><span>-$${itemDiscountTotal(item).toLocaleString()}　實收 $${itemNetSubtotal(item).toLocaleString()}</span></div>` : '';
 }
 function itemAdjustmentText(item) {
-  if (item.pricingMode === 'bargain' && item.category !== '客製') return `議價 開價$${itemAskingPrice(item)} 成交$${itemDealPrice(item)}  省$${itemBargainTotal(item)}  實收$${itemNetSubtotal(item)}`;
-  return itemDiscountTotal(item) > 0 ? `自取優惠 每盆-$${itemDiscountPerUnit(item)}  -$${itemDiscountTotal(item)}  實收$${itemNetSubtotal(item)}` : '';
+  return itemAdjustmentLines(item).join('\n');
+}
+function itemAdjustmentLines(item) {
+  if (item.pricingMode === 'bargain' && item.category !== '客製') return [`折扣  -$${itemBargainTotal(item)}`];
+  return itemDiscountTotal(item) > 0 ? [
+    `自取 每盆-$${itemDiscountPerUnit(item)}  共-$${itemDiscountTotal(item)}`,
+    `實收$${itemNetSubtotal(item)}`
+  ] : [];
 }
 
 // ── Cart Review ──
@@ -945,9 +951,9 @@ function renderCartReview() {
     </div>
     ${isBargain ? `<div class="discount-editor"><div class="bargain-badge">議價模式</div>
       <div class="bargain-fields">
-        <label>每盆開價<input type="number" min="0" step="1" value="${itemAskingPrice(item)}" onchange="setItemAskingPrice(decodeURIComponent('${encodedKey}'),this.value)" /></label>
-        <label>每盆成交價<input type="number" min="0" max="${itemAskingPrice(item)}" step="1" value="${itemDealPrice(item)}" onchange="setItemDealPrice(decodeURIComponent('${encodedKey}'),this.value)" /></label>
-      </div><div class="discount-result"><span>${item.qty}盆共省 $${itemBargainTotal(item).toLocaleString()}</span><span>本項實收 $${itemNetSubtotal(item).toLocaleString()}</span></div>
+        <label>價格<input type="number" min="0" step="1" value="${itemAskingPrice(item)}" onchange="setItemAskingPrice(decodeURIComponent('${encodedKey}'),this.value)" /></label>
+        <label>成交價格<input type="number" min="0" max="${itemAskingPrice(item)}" step="1" value="${itemDealPrice(item)}" onchange="setItemDealPrice(decodeURIComponent('${encodedKey}'),this.value)" /></label>
+      </div><div class="discount-result"><span>折扣 -$${itemBargainTotal(item).toLocaleString()}</span><span>本項實收 $${itemNetSubtotal(item).toLocaleString()}</span></div>
     </div>` : canDiscount ? `<div class="discount-editor">
       <label><input type="checkbox" ${hasDiscount ? 'checked' : ''} onchange="toggleItemDiscount(decodeURIComponent('${encodedKey}'),this.checked)" />本品項使用自取優惠</label>
       ${hasDiscount ? `<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;gap:10px;">
@@ -1120,7 +1126,7 @@ async function doPrintReprint(items, dateStr, customerName, totalQty, totalAmt) 
     const LINE_MD = 52 * PX;
     const LINE_SM = 44 * PX;
 
-    var lineCount = 7 + (items.length * 2) + 5;
+    var lineCount = 7 + (items.length * 3) + 5;
     var H = (lineCount * LINE_SM) + 200 * PX;
     var canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
@@ -1168,8 +1174,7 @@ async function doPrintReprint(items, dateStr, customerName, totalQty, totalAmt) 
     items.forEach(function(i) {
       drawLeft(String(i.name), FONT_SM, LINE_SM);
       drawRight('$' + itemAskingPrice(i) + ' x' + i.qty + ' = $' + itemDisplaySubtotal(i), FONT_SM, LINE_SM);
-      var adjustment = itemAdjustmentText(i);
-      if (adjustment) drawLeft(adjustment, FONT_SM, LINE_SM);
+      itemAdjustmentLines(i).forEach(function(line) { drawLeft(line, FONT_SM, LINE_SM); });
     });
     drawLine();
     drawLeft('共 ' + totalQty + ' 盆', FONT_MD, LINE_MD, true);
@@ -1280,8 +1285,7 @@ function buildPrintArea(totalQty, totalAmount) {
   html += `<div class="ph"><span>商品</span><span>單價</span><span>數量</span><span>小計</span></div><div class="pd"></div>`;
   items.forEach(i => {
     html += `<div class="pr4"><span>${i.name}</span><span>${itemAskingPrice(i)}</span><span>x${i.qty}</span><span>${itemDisplaySubtotal(i).toLocaleString()}</span></div>`;
-    const adjustment = itemAdjustmentText(i);
-    if (adjustment) html += `<div class="pr"><span>${adjustment}</span><span></span></div>`;
+    itemAdjustmentLines(i).forEach(line => { html += `<div class="pr"><span>${line}</span><span></span></div>`; });
   });
   html += `<div class="pt"><span>共${totalQty}盆</span><span>$${totalAmount.toLocaleString()}</span></div>`;
   document.getElementById('print-area').innerHTML = html;
@@ -1295,8 +1299,7 @@ function receiptText() {
   let lines = ['竹緣開運竹 結帳單', dateStr, `客戶：${currentCustomer.name}`, '---'];
   items.forEach(i => {
     lines.push(`${i.name} $${itemAskingPrice(i)} x${i.qty}  $${itemDisplaySubtotal(i).toLocaleString()}`);
-    const adjustment = itemAdjustmentText(i);
-    if (adjustment) lines.push('  ' + adjustment);
+    itemAdjustmentLines(i).forEach(line => lines.push('  ' + line));
   });
   lines.push('---');
   lines.push(`共${cartQty()}盆  總計 $${cartTotal().toLocaleString()}`);
@@ -1326,8 +1329,7 @@ async function doPrint() {
       items.forEach(i => {
         window.printer.printText(i.name + '\n');
         window.printer.printText('  $' + itemAskingPrice(i) + ' x' + i.qty + ' = $' + itemDisplaySubtotal(i).toLocaleString() + '\n');
-        const adjustment = itemAdjustmentText(i);
-        if (adjustment) window.printer.printText('  ' + adjustment + '\n');
+        itemAdjustmentLines(i).forEach(line => window.printer.printText('  ' + line + '\n'));
       });
       window.printer.printText('------------------------\n');
       window.printer.setAlignment(1);
@@ -1354,7 +1356,7 @@ async function doPrint() {
     const LINE_MD = 52 * PX;
     const LINE_SM = 44 * PX;
 
-    var lineCount = 7 + (items.length * 2) + 5;
+    var lineCount = 7 + (items.length * 3) + 5;
     var H = (lineCount * LINE_SM) + 200 * PX;
 
     var canvas = document.createElement('canvas');
@@ -1419,8 +1421,7 @@ async function doPrint() {
     items.forEach(function(i) {
       drawLeft(String(i.name), FONT_SM, LINE_SM, false);
       drawRight('$' + itemAskingPrice(i) + ' x' + i.qty + ' = $' + itemDisplaySubtotal(i), FONT_SM, LINE_SM, false);
-      var adjustment = itemAdjustmentText(i);
-      if (adjustment) drawLeft(adjustment, FONT_SM, LINE_SM, false);
+      itemAdjustmentLines(i).forEach(function(line) { drawLeft(line, FONT_SM, LINE_SM, false); });
     });
 
     drawLine();
@@ -1447,7 +1448,7 @@ async function doPrint() {
         } catch(e) {}
       } else if (navigator.share) {
         var text = '竹緣開運竹\n結帳單\n' + dateStr + '\n客戶：' + currentCustomer.name + '\n';
-        items.forEach(function(i) { var adjustment = itemAdjustmentText(i); text += i.name + ' x' + i.qty + ' $' + itemDisplaySubtotal(i) + (adjustment ? '\n' + adjustment : '') + '\n'; });
+        items.forEach(function(i) { var lines = itemAdjustmentLines(i); text += i.name + ' x' + i.qty + ' $' + itemDisplaySubtotal(i) + (lines.length ? '\n' + lines.join('\n') : '') + '\n'; });
         text += '共' + totalQty + '盆 總計$' + totalAmt + '元';
         try { await navigator.share({ text: text }); } catch(e) {}
       }
@@ -1519,7 +1520,7 @@ async function shareReprintToLine(dateStr, customerName, items, totalQty, totalA
   const LINE_MD = 52 * PX;
   const LINE_SM = 44 * PX;
 
-  var lineCount = 7 + (items.length * 2) + 5;
+  var lineCount = 7 + (items.length * 3) + 5;
   var H = (lineCount * LINE_SM) + 200 * PX;
   var canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
@@ -1567,8 +1568,7 @@ async function shareReprintToLine(dateStr, customerName, items, totalQty, totalA
   items.forEach(function(i) {
     drawLeft(String(i.name), FONT_SM, LINE_SM);
     drawRight('$' + itemAskingPrice(i) + ' x' + i.qty + ' = $' + itemDisplaySubtotal(i), FONT_SM, LINE_SM);
-    var adjustment = itemAdjustmentText(i);
-    if (adjustment) drawLeft(adjustment, FONT_SM, LINE_SM);
+    itemAdjustmentLines(i).forEach(function(line) { drawLeft(line, FONT_SM, LINE_SM); });
   });
   drawLine();
   drawLeft('共 ' + totalQty + ' 盆', FONT_MD, LINE_MD, true);
