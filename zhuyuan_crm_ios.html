@@ -930,7 +930,7 @@ function itemPrintAdjustmentRows(item) {
     { left: '', right: '實收 $' + itemNetSubtotal(item) }
   ];
   return itemDiscountTotal(item) > 0 ? [
-    { left: '自取  每盆-$' + itemDiscountPerUnit(item), right: '共-$' + itemDiscountTotal(item) },
+    { left: '優惠  每盆-$' + itemDiscountPerUnit(item), right: '共-$' + itemDiscountTotal(item) },
     { left: '', right: '實收 $' + itemNetSubtotal(item) }
   ] : [];
 }
