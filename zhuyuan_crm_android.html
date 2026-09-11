@@ -429,7 +429,15 @@ let bargainingMode = false;
 
 // ── 離線佇列（B方案）──
 const QUEUE_KEY = 'zhuOrderQueue';
-function getQueue() { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); }
+function newClientOrderId() { return 'WEB-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10); }
+function getQueue() {
+  let rows; try { rows = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch(e) { rows = []; }
+  if (!Array.isArray(rows)) rows = [];
+  let changed = false;
+  rows.forEach(order => { if (!order.clientOrderId) { order.clientOrderId = newClientOrderId(); changed = true; } });
+  if (changed) localStorage.setItem(QUEUE_KEY, JSON.stringify(rows));
+  return rows;
+}
 function saveQueue(q) { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
 function enqueueOrder(order) {
   const q = getQueue();
@@ -452,7 +460,7 @@ async function uploadQueue() {
   const remaining = [];
   for (const order of q) {
     try {
-      const res = await apiPost({ action: 'saveOrder', customerId: order.customerId, customerName: order.customerName, items: order.items, totalQty: order.totalQty, totalAmount: order.totalAmount });
+      const res = await apiPost({ action: 'saveOrder', clientOrderId: order.clientOrderId, customerId: order.customerId, customerName: order.customerName, items: order.items, totalQty: order.totalQty, totalAmount: order.totalAmount });
       if (!res || !res.success) remaining.push(order);
     } catch(e) { remaining.push(order); }
   }
@@ -466,18 +474,44 @@ async function uploadQueue() {
 }
 
 // ── 刪除訂單 ──
+async function fetchApiJson(url, timeoutMs = 30000) {
+  const controller = new AbortController();
+  let timer;
+  try {
+    const joiner = url.includes('?') ? '&' : '?';
+    const request = (async () => {
+      const response = await fetch(url + joiner + '_ts=' + Date.now(), { signal: controller.signal, cache: 'no-store' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      return await response.json();
+    })();
+    const timeout = new Promise((resolve, reject) => {
+      timer = setTimeout(() => { controller.abort(); reject(new Error('連線逾時，請稍後再試')); }, timeoutMs);
+    });
+    return await Promise.race([request, timeout]);
+  } finally { clearTimeout(timer); }
+}
+async function fetchApiJsonWithRetry(url, timeoutMs = 30000, attempts = 2) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try { return await fetchApiJson(url, timeoutMs); }
+    catch (error) { lastError = error; if (attempt + 1 < attempts) await new Promise(resolve => setTimeout(resolve, 800)); }
+  }
+  throw lastError;
+}
 async function deleteOrder(orderId) {
   if (!confirm('確定要刪除這筆訂單嗎？')) return;
+  const button = document.getElementById('reprint-delete-btn');
+  if (button) { button.disabled = true; button.textContent = '刪除中…'; }
   try {
     const url = API_URL + '?action=deleteOrder&orderId=' + encodeURIComponent(orderId);
-    const r = await fetch(url);
-    const data = await r.json();
+    const data = await fetchApiJsonWithRetry(url, 30000, 2);
     if (data.success) {
       alert('已刪除');
       switchScreen('history');
       if (document.getElementById('history-view-search').style.display !== 'none') runHistorySearch();
     } else { alert('刪除失敗：' + (data.error || '未知錯誤')); }
-  } catch(e) { alert('網路錯誤，無法刪除'); }
+  } catch(e) { alert('刪除結果尚未確認，請重新整理紀錄後確認；系統不會因重按而刪除其他訂單。'); }
+  finally { if (button) { button.disabled = false; button.textContent = '刪除這筆訂單'; } }
 }
 
 // ── Init ──
@@ -517,8 +551,7 @@ function loadDefaultProducts() {
 // ── API ──
 async function fetchProducts() {
   try {
-    const r = await fetch(API_URL + '?action=getProducts');
-    const data = await r.json();
+    const data = await fetchApiJsonWithRetry(API_URL + '?action=getProducts', 30000, 2);
     if (Array.isArray(data) && data.length) {
       products = data;
       localStorage.setItem('zhuProducts', JSON.stringify(products));
@@ -529,8 +562,7 @@ async function fetchProducts() {
 async function fetchCustomerOrders(customerId) {
   if (!API_URL) return [];
   try {
-    const r = await fetch(`${API_URL}?action=getCustomerOrders&customerId=${customerId}`);
-    return await r.json();
+    return await fetchApiJsonWithRetry(`${API_URL}?action=getCustomerOrders&customerId=${encodeURIComponent(customerId)}`, 30000, 2);
   } catch(e) { return []; }
 }
 
@@ -543,18 +575,17 @@ async function apiPost(payload) {
       const itemsEncoded = encodeURIComponent(JSON.stringify(payload.items));
       const url = API_URL
         + '?action=saveOrderGet'
+        + '&clientOrderId=' + encodeURIComponent(payload.clientOrderId || '')
         + '&customerId=' + encodeURIComponent(payload.customerId)
         + '&customerName=' + encodeURIComponent(payload.customerName)
         + '&totalQty=' + payload.totalQty
         + '&totalAmount=' + payload.totalAmount
         + '&items=' + itemsEncoded;
-      const r = await fetch(url);
-      return await r.json();
+      return await fetchApiJson(url, 30000);
     }
     if (action === 'addCustomer') {
       const url = API_URL + '?action=addCustomerGet&name=' + encodeURIComponent(payload.name);
-      const r = await fetch(url);
-      return await r.json();
+      return await fetchApiJson(url, 30000);
     }
     // 其他 action 仍用 POST
     const r = await fetch(API_URL, {
@@ -1032,6 +1063,7 @@ async function completeOrder() {
     items: JSON.parse(JSON.stringify(items)),
     totalQty,
     totalAmount,
+    clientOrderId: newClientOrderId(),
     pricingMode: bargainingMode ? 'bargain' : 'regular'
   };
 
@@ -1217,7 +1249,10 @@ async function completeAndSave() {
     let online = navigator.onLine;
     if (online) {
       try {
-        const res = await apiPost({ action: 'saveOrder', customerId: order.customerId, customerName: order.customerName, items: order.items, totalQty: order.totalQty, totalAmount: order.totalAmount });
+        const res = await Promise.race([
+          apiPost({ action: 'saveOrder', clientOrderId: order.clientOrderId, customerId: order.customerId, customerName: order.customerName, items: order.items, totalQty: order.totalQty, totalAmount: order.totalAmount }),
+          new Promise(resolve => setTimeout(() => resolve(null), 15000))
+        ]);
         if (!res || !res.success) online = false;
       } catch(e) { online = false; }
     }
@@ -1227,7 +1262,7 @@ async function completeAndSave() {
       enqueueOrder(order);
     } else {
       // 線上成功：同步客戶資料
-      try { const r = await fetch(API_URL + '?action=getCustomers'); const data = await r.json(); if (Array.isArray(data)) { customers = data; localStorage.setItem('zhuCustomers', JSON.stringify(customers)); } } catch(e) {}
+      fetchCustomers().catch(() => {});
     }
   }
   newOrder();
@@ -1790,27 +1825,9 @@ function renderHistoryCards(listEl, orders) {
 }
 
 async function fetchHistoryOrders() {
-  const controller = new AbortController();
-  let timeoutId;
-  try {
-    const request = (async () => {
-      const response = await fetch(API_URL + '?action=getAllOrders', { signal: controller.signal });
-      if (!response.ok) throw new Error('伺服器回應異常（HTTP ' + response.status + '）');
-      const data = await response.json();
-      if (!Array.isArray(data)) {
-        throw new Error(data && data.error ? String(data.error) : '伺服器回傳的訂單格式不正確');
-      }
-      return data;
-    })();
-    const timeout = new Promise((resolve, reject) => {
-      timeoutId = setTimeout(() => {
-        reject(new Error('查詢超過 20 秒，請確認網路後再試一次。'));
-        controller.abort();
-      }, 20000);
-    });
-    return await Promise.race([request, timeout]);
-
-  } finally { clearTimeout(timeoutId); }
+  const data = await fetchApiJsonWithRetry(API_URL + '?action=getAllOrders', 45000, 2);
+  if (!Array.isArray(data)) throw new Error(data && data.error ? String(data.error) : '伺服器回傳的訂單格式不正確');
+  return data;
 }
 
 async function runHistorySearch() {
@@ -1946,8 +1963,7 @@ function showSyncSummary(prodCount, custCount) {
 
 async function fetchCustomers() {
   try {
-    const r = await fetch(API_URL + '?action=getCustomers');
-    const data = await r.json();
+    const data = await fetchApiJsonWithRetry(API_URL + '?action=getCustomers', 30000, 2);
     if (Array.isArray(data)) {
       customers = data;
       localStorage.setItem('zhuCustomers', JSON.stringify(customers));
