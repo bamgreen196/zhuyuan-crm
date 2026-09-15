@@ -574,6 +574,25 @@ let costSelectedCategory = '';
 
 function escapeHtml(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function closeCostModal(event) { if (!event || event.target === document.getElementById('cost-modal')) document.getElementById('cost-modal').classList.remove('open'); }
+async function fetchApiJsonUrl(url, attempts) {
+  let lastError; attempts = attempts || 3;
+  for (let attempt=0; attempt<attempts; attempt++) {
+    try {
+      const response = await fetch(url + (url.indexOf('?')>=0?'&':'?') + '_=' + Date.now(), {cache:'no-store',redirect:'follow'});
+      const text = await response.text();
+      if (!response.ok) throw new Error('伺服器錯誤 HTTP ' + response.status);
+      if (/^\s*</.test(text)) throw new Error('Google 暫時回傳登入或中介頁');
+      const data = JSON.parse(text);
+      if (data && data.error) throw new Error(data.error);
+      return data;
+    } catch (error) {
+      lastError=error;
+      if (attempt<attempts-1) await new Promise(function(resolve){setTimeout(resolve,700*(attempt+1));});
+    }
+  }
+  throw lastError || new Error('無法讀取資料');
+}
+function fetchApiJson(action) { return fetchApiJsonUrl(API_URL + '?action=' + encodeURIComponent(action), 3); }
 async function openCostSetup() {
   document.getElementById('cost-modal').classList.add('open');
   document.getElementById('cost-source-status').className = 'cost-source-status';
@@ -587,19 +606,7 @@ async function openCostSetup() {
   }
 }
 async function fetchCostSetupDataJson() {
-  let lastError;
-  for (let attempt=0; attempt<3; attempt++) {
-    try {
-      const response = await fetch(API_URL + '?action=getCostSetupData&_=' + Date.now(), {cache:'no-store',redirect:'follow'});
-      const text = await response.text();
-      if (!response.ok) throw new Error('伺服器錯誤 HTTP ' + response.status);
-      if (/^\s*</.test(text)) throw new Error('Google 暫時回傳登入或中介頁');
-      const data = JSON.parse(text);
-      if (data.error) throw new Error(data.error);
-      return data;
-    } catch (error) { lastError=error; if (attempt<2) await new Promise(function(resolve){setTimeout(resolve,700*(attempt+1));}); }
-  }
-  throw lastError || new Error('無法讀取成本資料');
+  return fetchApiJson('getCostSetupData');
 }
 function renderCostSetupData() {
     const status = document.getElementById('cost-source-status');
@@ -672,7 +679,7 @@ async function saveCostRecipe() {
   button.disabled = true; button.textContent = '儲存中…'; msg.textContent = '';
   try {
     const url = API_URL + '?action=saveProductRecipeGet&category=' + encodeURIComponent(product.category) + '&name=' + encodeURIComponent(product.name) + '&recipe=' + encodeURIComponent(JSON.stringify(recipe)) + '&_=' + Date.now();
-    const response = await fetch(url), result = await response.json(); if (result.error) throw new Error(result.error);
+    const result = await fetchApiJsonUrl(url, 3);
     msg.textContent = '已儲存，每盆成本 $' + Number(result.unitCost).toLocaleString();
     const old = selectedRecipeFor(product), next = {category:product.category,name:product.name,recipe:recipe,unitCost:result.unitCost,complete:true,updatedAt:result.updatedAt};
     if (old) Object.assign(old,next); else costSetupData.recipes.push(next);
@@ -892,9 +899,11 @@ async function loadReport() {
   const area = document.getElementById('report-area');
   area.innerHTML = '<div class="loading dot-anim">載入中</div>';
   try {
-    const r = await fetch(API_URL + '?action=getReport');
-    reportData = await r.json();
-    if (reportData.error) throw new Error(reportData.error);
+    const bundle = await fetchApiJson('getReportBundle');
+    if (!bundle || !bundle.report || !Array.isArray(bundle.orders)) throw new Error('報表資料格式不正確');
+    reportData = bundle.report;
+    const allOrders = bundle.orders;
+    allOrdersCache = allOrders;
 
     const years = [...new Set(reportData.monthly.map(m => m.month.slice(0,4)))].sort().reverse();
     const sel = document.getElementById('year-select');
@@ -916,13 +925,6 @@ async function loadReport() {
     // 預設選最近兩年
     if (years.length >= 1) cmpA.value = years[0];
     if (years.length >= 2) cmpB.value = years[1];
-    // 預先撈所有訂單，補充上次叫貨日期
-    let allOrders = [];
-    try {
-      const ro = await fetch(API_URL + '?action=getAllOrders');
-      const od = await ro.json();
-      if (Array.isArray(od)) { allOrders = od; allOrdersCache = od; }
-    } catch(e) {}
     reportData._allCustomersRaw = reportData.customers;
     reportData.customers = buildAllCustomersWithDate(reportData.customers, allOrders);
     renderReport('all');
@@ -1224,9 +1226,7 @@ async function showMonthDetail(month) {
   document.getElementById('month-modal').classList.add('open');
 
   try {
-    const r = await fetch(API_URL + '?action=getAllOrders');
-    const orders = await r.json();
-    if (!Array.isArray(orders)) throw new Error('資料錯誤');
+    const orders = await getAllOrdersCached();
 
     const monthOrders = orders.filter(o => o.date && o.date.startsWith(month));
 
@@ -1301,9 +1301,7 @@ async function showCustomerDetail(encodedName, totalAmount, orderCount) {
 
   try {
     // 從所有訂單裡篩這個客戶（用名字比對，因為排行榜只有名字）
-    const r = await fetch(API_URL + '?action=getAllOrders');
-    const orders = await r.json();
-    if (!Array.isArray(orders)) throw new Error('資料錯誤');
+    const orders = await getAllOrdersCached();
 
     const custOrders = orders.filter(o => o.customerName === name);
 
@@ -1397,8 +1395,7 @@ let allOrdersCache = null;
 
 async function getAllOrdersCached() {
   if (allOrdersCache) return allOrdersCache;
-  const r = await fetch(API_URL + '?action=getAllOrders');
-  const data = await r.json();
+  const data = await fetchApiJson('getAllOrders');
   if (!Array.isArray(data)) throw new Error('資料格式錯誤');
   allOrdersCache = data;
   return allOrdersCache;
