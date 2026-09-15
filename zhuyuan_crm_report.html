@@ -580,9 +580,28 @@ async function openCostSetup() {
   document.getElementById('cost-source-status').textContent = '正在讀取庫存價格…';
   document.getElementById('cost-editor').innerHTML = '';
   try {
-    const response = await fetch(API_URL + '?action=getCostSetupData&_=' + Date.now());
-    costSetupData = await response.json();
-    if (costSetupData.error) throw new Error(costSetupData.error);
+    if (!costSetupData) costSetupData = await fetchCostSetupDataJson();
+    renderCostSetupData();
+  } catch (error) {
+    document.getElementById('cost-source-status').textContent = '讀取失敗：' + error.message;
+  }
+}
+async function fetchCostSetupDataJson() {
+  let lastError;
+  for (let attempt=0; attempt<3; attempt++) {
+    try {
+      const response = await fetch(API_URL + '?action=getCostSetupData&_=' + Date.now(), {cache:'no-store',redirect:'follow'});
+      const text = await response.text();
+      if (!response.ok) throw new Error('伺服器錯誤 HTTP ' + response.status);
+      if (/^\s*</.test(text)) throw new Error('Google 暫時回傳登入或中介頁');
+      const data = JSON.parse(text);
+      if (data.error) throw new Error(data.error);
+      return data;
+    } catch (error) { lastError=error; if (attempt<2) await new Promise(function(resolve){setTimeout(resolve,700*(attempt+1));}); }
+  }
+  throw lastError || new Error('無法讀取成本資料');
+}
+function renderCostSetupData() {
     const status = document.getElementById('cost-source-status');
     status.className = 'cost-source-status' + (costSetupData.ready ? ' ready' : '');
     status.textContent = costSetupData.ready ? '庫存價格已連線；修改庫存單價後，這裡會自動採用新價格。' : (costSetupData.message || '庫存價格尚未連線');
@@ -590,10 +609,8 @@ async function openCostSetup() {
     const categories = Array.from(new Set((costSetupData.products || []).map(function(p){ return p.category; })));
     costSelectedCategory = categories[0] || '';
     renderCostProductChoices();
-  } catch (error) {
-    document.getElementById('cost-source-status').textContent = '讀取失敗：' + error.message;
-  }
 }
+function preloadCostSetup() { if (costSetupData) return; fetchCostSetupDataJson().then(function(data){costSetupData=data;}).catch(function(){}); }
 
 function selectedCostProduct() {
   return costSetupData && costSelectedProductIndex >= 0 ? costSetupData.products[costSelectedProductIndex] : null;
@@ -909,6 +926,7 @@ async function loadReport() {
     reportData._allCustomersRaw = reportData.customers;
     reportData.customers = buildAllCustomersWithDate(reportData.customers, allOrders);
     renderReport('all');
+    setTimeout(preloadCostSetup, 300);
   } catch(e) {
     area.innerHTML = '<div class="loading">載入失敗：' + e.message + '</div>';
   }
