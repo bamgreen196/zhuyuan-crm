@@ -43,7 +43,7 @@
   }
   header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
   header p  { font-size: 13px; opacity: 0.8; margin-top: 2px; }
-  .header-right { display: flex; align-items: center; gap: 12px; }
+  .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
   .year-select {
     background: rgba(255,255,255,0.15);
     border: 1px solid rgba(255,255,255,0.3);
@@ -65,6 +65,7 @@
     transition: background 0.2s;
   }
   .reload-btn:hover { background: rgba(255,255,255,0.25); }
+  .cost-btn { background: #fff; color: var(--green); border: 0; padding: 7px 14px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
 
   /* Layout */
   main {
@@ -188,6 +189,9 @@
     .stats-row { grid-template-columns: repeat(2, 1fr); }
     .grid-2    { grid-template-columns: 1fr; }
     main { padding: 16px; }
+    header { padding: 14px 16px; align-items:flex-start; gap:12px; }
+    .header-right { gap:7px; }
+    .cost-btn, .reload-btn, .year-select { font-size:12px; padding:6px 9px; }
   }
 
   /* 年度長條圖 */
@@ -284,6 +288,18 @@
   }
   .modal-close:hover { color: var(--ink); }
   .modal-body { padding: 20px 24px; }
+  .cost-form-row { margin-bottom: 16px; }
+  .cost-form-row label { display:block; font-size:12px; color:var(--ink2); margin-bottom:6px; font-weight:600; }
+  .cost-select { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:white; font:inherit; }
+  .cost-source-status { padding:10px 12px; border-radius:8px; margin-bottom:14px; font-size:13px; background:#fff8dc; color:#7a5a00; }
+  .cost-source-status.ready { background:var(--green3); color:var(--green); }
+  .cost-material-title { font-size:13px; font-weight:700; margin:16px 0 8px; }
+  .cost-material-row { display:grid; grid-template-columns:1fr 92px 72px; gap:8px; align-items:center; padding:7px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .cost-material-row input { width:100%; padding:7px; border:1px solid var(--border); border-radius:7px; text-align:right; font:inherit; }
+  .cost-preview { margin-top:16px; padding:14px; border-radius:10px; background:var(--bg); display:flex; justify-content:space-between; align-items:center; }
+  .cost-preview strong { color:var(--green); font-size:22px; }
+  .cost-save { width:100%; margin-top:12px; padding:11px; border:0; border-radius:9px; background:var(--green); color:white; font:inherit; font-weight:700; cursor:pointer; }
+  .cost-save:disabled { opacity:.55; cursor:wait; }
 
   .customer-link {
     cursor: pointer;
@@ -457,6 +473,7 @@
     <p>營業報表系統</p>
   </div>
   <div class="header-right">
+    <button class="cost-btn" onclick="openCostSetup()">🧮 成本設定</button>
     <select class="year-select" id="year-select" onchange="filterYear()">
       <option value="all">全部年份</option>
     </select>
@@ -496,6 +513,18 @@
   </div>
 </main>
 
+<!-- 商品成本配方 Modal -->
+<div class="modal-overlay" id="cost-modal" onclick="closeCostModal(event)">
+  <div class="modal-box" style="width:680px;">
+    <div class="modal-header"><div><div class="modal-title">商品成本設定</div><div class="modal-sub">選擇 CRM 商品，輸入每盆使用的竹子、配件與盆器數量</div></div><button class="modal-close" onclick="document.getElementById('cost-modal').classList.remove('open')">✕</button></div>
+    <div class="modal-body">
+      <div id="cost-source-status" class="cost-source-status">正在讀取庫存價格…</div>
+      <div class="cost-form-row"><label>CRM 商品</label><select id="cost-product" class="cost-select" onchange="loadSelectedRecipe()"><option value="">請選擇商品</option></select></div>
+      <div id="cost-editor"></div>
+    </div>
+  </div>
+</div>
+
 <!-- 月份訂單 Modal -->
 <div class="modal-overlay" id="month-modal" onclick="closeMonthModal(event)">
   <div class="modal-box" style="width:720px;">
@@ -530,6 +559,81 @@
 
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbybC0nhwz_ELXYt-bWgG7V-Y8TTgtwW1pMTdy96JhI3ORYSjVuNC2chd0aze9QXUIw/exec';
+let costSetupData = null;
+
+function escapeHtml(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function closeCostModal(event) { if (!event || event.target === document.getElementById('cost-modal')) document.getElementById('cost-modal').classList.remove('open'); }
+async function openCostSetup() {
+  document.getElementById('cost-modal').classList.add('open');
+  document.getElementById('cost-source-status').className = 'cost-source-status';
+  document.getElementById('cost-source-status').textContent = '正在讀取庫存價格…';
+  document.getElementById('cost-editor').innerHTML = '';
+  try {
+    const response = await fetch(API_URL + '?action=getCostSetupData&_=' + Date.now());
+    costSetupData = await response.json();
+    if (costSetupData.error) throw new Error(costSetupData.error);
+    const status = document.getElementById('cost-source-status');
+    status.className = 'cost-source-status' + (costSetupData.ready ? ' ready' : '');
+    status.textContent = costSetupData.ready ? '庫存價格已連線；修改庫存單價後，這裡會自動採用新價格。' : (costSetupData.message || '庫存價格尚未連線');
+    const select = document.getElementById('cost-product');
+    select.innerHTML = '<option value="">請選擇商品</option>' + (costSetupData.products || []).map(function(p, i){ return '<option value="' + i + '">' + escapeHtml(p.category + '｜' + p.name) + '</option>'; }).join('');
+  } catch (error) {
+    document.getElementById('cost-source-status').textContent = '讀取失敗：' + error.message;
+  }
+}
+
+function selectedCostProduct() {
+  const index = Number(document.getElementById('cost-product').value);
+  return costSetupData && document.getElementById('cost-product').value !== '' ? costSetupData.products[index] : null;
+}
+function selectedRecipeFor(product) {
+  return (costSetupData.recipes || []).find(function(r){ return r.category === product.category && r.name === product.name; }) || null;
+}
+function loadSelectedRecipe() {
+  const product = selectedCostProduct(), editor = document.getElementById('cost-editor');
+  if (!product) { editor.innerHTML = ''; return; }
+  const saved = selectedRecipeFor(product), recipe = saved ? saved.recipe : {materials:[],pot:null};
+  const qtyMap = {}; (recipe.materials || []).forEach(function(m){ qtyMap[m.name] = Number(m.qty) || 0; });
+  const groups = ['竹子','配件']; let html = '';
+  groups.forEach(function(group){
+    const list = (costSetupData.materials || []).filter(function(m){ return m.group === group; });
+    if (!list.length) return;
+    html += '<div class="cost-material-title">' + group + '用量（每盆）</div>';
+    list.forEach(function(m){ html += '<div class="cost-material-row"><span>' + escapeHtml(m.name) + '</span><input class="material-qty" data-name="' + escapeHtml(m.name) + '" data-price="' + m.price + '" type="number" min="0" step="0.01" value="' + (qtyMap[m.name] || '') + '" placeholder="0" oninput="updateCostPreview()"><span>$' + Number(m.price).toLocaleString() + '/' + escapeHtml(m.unit || '單位') + '</span></div>'; });
+  });
+  html += '<div class="cost-material-title">盆器</div><div class="cost-form-row"><select id="cost-pot" class="cost-select" onchange="updateCostPreview()"><option value="">不使用盆器</option>';
+  (costSetupData.pots || []).forEach(function(p, i){ html += '<option value="' + i + '"' + (recipe.pot && recipe.pot.sku === p.sku ? ' selected' : '') + '>' + escapeHtml(p.label) + '｜$' + Number(p.price).toLocaleString() + '｜庫存 ' + p.stock + '</option>'; });
+  html += '</select></div><div class="cost-form-row"><label>每盆使用盆器數量</label><input id="cost-pot-qty" class="cost-select" type="number" min="0" step="0.01" value="' + (recipe.pot ? Number(recipe.pot.qty) || 1 : 1) + '" oninput="updateCostPreview()"></div>';
+  html += '<div class="cost-preview"><span>目前每盆成本</span><strong id="cost-preview-value">$0</strong></div><button id="cost-save" class="cost-save" onclick="saveCostRecipe()">儲存成本配方</button><div id="cost-save-msg" style="font-size:13px;text-align:center;margin-top:8px;color:var(--ink2);"></div>';
+  editor.innerHTML = html; updateCostPreview();
+}
+function collectCostRecipe() {
+  const materials = Array.from(document.querySelectorAll('.material-qty')).map(function(input){ return {name:input.dataset.name, qty:Number(input.value)||0}; }).filter(function(m){ return m.qty > 0; });
+  const potSelect = document.getElementById('cost-pot'), potIndex = potSelect && potSelect.value !== '' ? Number(potSelect.value) : -1;
+  const p = potIndex >= 0 ? costSetupData.pots[potIndex] : null;
+  return { materials:materials, pot:p ? {sku:p.sku,name:p.label,qty:Number(document.getElementById('cost-pot-qty').value)||0} : null };
+}
+function updateCostPreview() {
+  if (!costSetupData || !document.getElementById('cost-preview-value')) return;
+  const recipe = collectCostRecipe(); let total = 0;
+  recipe.materials.forEach(function(m){ const src = costSetupData.materials.find(function(x){return x.name===m.name;}); if(src) total += src.price*m.qty; });
+  if (recipe.pot) { const pot = costSetupData.pots.find(function(x){return x.sku===recipe.pot.sku;}); if(pot) total += pot.price*recipe.pot.qty; }
+  document.getElementById('cost-preview-value').textContent = '$' + Math.round(total * 100) / 100;
+}
+async function saveCostRecipe() {
+  const product = selectedCostProduct(), button = document.getElementById('cost-save'), msg = document.getElementById('cost-save-msg');
+  if (!product) return;
+  const recipe = collectCostRecipe();
+  button.disabled = true; button.textContent = '儲存中…'; msg.textContent = '';
+  try {
+    const url = API_URL + '?action=saveProductRecipeGet&category=' + encodeURIComponent(product.category) + '&name=' + encodeURIComponent(product.name) + '&recipe=' + encodeURIComponent(JSON.stringify(recipe)) + '&_=' + Date.now();
+    const response = await fetch(url), result = await response.json(); if (result.error) throw new Error(result.error);
+    msg.textContent = '已儲存，每盆成本 $' + Number(result.unitCost).toLocaleString();
+    const old = selectedRecipeFor(product), next = {category:product.category,name:product.name,recipe:recipe,unitCost:result.unitCost,complete:true,updatedAt:result.updatedAt};
+    if (old) Object.assign(old,next); else costSetupData.recipes.push(next);
+  } catch (error) { msg.textContent = '儲存失敗：' + error.message; }
+  finally { button.disabled = false; button.textContent = '儲存成本配方'; }
+}
 
 // ── 年度比較 ──
 function runCompare() {
@@ -783,14 +887,60 @@ async function loadReport() {
 }
 
 function filterYear() {
-  // 切換年份時重新算客戶列表（依該年訂單）
   const year = document.getElementById('year-select').value;
-  if (allOrdersCache) {
-    const filtered = year === 'all' ? allOrdersCache : allOrdersCache.filter(o => (o.date||'').startsWith(year));
-    reportData.customers = buildAllCustomersWithDate(reportData._allCustomersRaw, filtered);
-  }
   window._custPage = 1;
   renderReport(year);
+}
+
+function buildPeriodMetrics(orders, year) {
+  const filtered = (Array.isArray(orders) ? orders : []).filter(function(order) {
+    return year === 'all' || (order.date || '').startsWith(year);
+  });
+  const products = {}, customers = {};
+  let knownRevenue = 0, totalCost = 0, missingItems = 0;
+  filtered.forEach(function(order) {
+    const customerName = order.customerName || '未命名客戶';
+    if (!customers[customerName]) customers[customerName] = { name: customerName, amount: 0, count: 0, lastDate: '—' };
+    customers[customerName].amount += Number(order.totalAmount) || 0;
+    customers[customerName].count++;
+    const date = (order.date || '').slice(0, 10);
+    if (date && (customers[customerName].lastDate === '—' || date > customers[customerName].lastDate)) customers[customerName].lastDate = date;
+    let orderItems = Array.isArray(order.items) ? order.items : [];
+    if (!orderItems.length && order.detail) {
+      orderItems = String(order.detail).split('、').map(function(part) {
+        const match = part.match(/^(.+?) x(\d+)\(\$(\d+(?:\.\d+)?)\)$/);
+        if (!match) return null;
+        const qty = Number(match[2]) || 0;
+        return { name: match[1], qty: qty, price: qty > 0 ? (Number(match[3]) || 0) / qty : 0, netPrice: qty > 0 ? (Number(match[3]) || 0) / qty : 0, costComplete: false };
+      }).filter(Boolean);
+    }
+    orderItems.forEach(function(item) {
+      const name = item.name || '未命名商品';
+      const qty = Math.max(0, Number(item.qty) || 0);
+      const revenue = Math.max(0, Number(item.netPrice) >= 0 ? Number(item.netPrice) : Number(item.price) || 0) * qty;
+      if (!products[name]) products[name] = { name: name, qty: 0, amount: 0, knownRevenue: 0, cost: 0, missingItems: 0 };
+      products[name].qty += qty;
+      products[name].amount += revenue;
+      if (item.costComplete === true && item.unitCost !== null && isFinite(Number(item.unitCost))) {
+        const cost = Math.max(0, Number(item.unitCost)) * qty;
+        products[name].knownRevenue += revenue;
+        products[name].cost += cost;
+        knownRevenue += revenue;
+        totalCost += cost;
+      } else {
+        products[name].missingItems++;
+        missingItems++;
+      }
+    });
+  });
+  return {
+    products: Object.values(products).sort(function(a,b) { return b.qty - a.qty; }).slice(0, 10),
+    customers: Object.values(customers).sort(function(a,b) { return b.amount - a.amount; }),
+    knownRevenue: knownRevenue, totalCost: totalCost,
+    grossProfit: knownRevenue - totalCost,
+    marginRate: knownRevenue > 0 ? (knownRevenue - totalCost) / knownRevenue * 100 : 0,
+    missingItems: missingItems
+  };
 }
 
 function renderReport(year) {
@@ -802,8 +952,14 @@ function renderReport(year) {
   const totalOrders = monthly.reduce((s, m) => s + m.count, 0);
   const avgOrder    = totalOrders > 0 ? Math.round(totalAmount / totalOrders) : 0;
   const maxMonth    = monthly.length > 0 ? Math.max(...monthly.map(m => m.amount)) : 1;
-  const products    = reportData.products;
-  const customers   = reportData.customers;
+  const period = buildPeriodMetrics(allOrdersCache || [], year);
+  const products = allOrdersCache ? period.products : reportData.products;
+  const customers = allOrdersCache ? period.customers : reportData.customers;
+  const knownRevenue = allOrdersCache ? period.knownRevenue : monthly.reduce((s, m) => s + (m.knownRevenue || 0), 0);
+  const totalCost = allOrdersCache ? period.totalCost : monthly.reduce((s, m) => s + (m.cost || 0), 0);
+  const grossProfit = knownRevenue - totalCost;
+  const marginRate = knownRevenue > 0 ? grossProfit / knownRevenue * 100 : 0;
+  const missingItems = allOrdersCache ? period.missingItems : monthly.reduce((s, m) => s + (m.missingItems || 0), 0);
 
   let html = '';
 
@@ -813,7 +969,24 @@ function renderReport(year) {
   html += statCard('總訂單數', totalOrders + ' 筆', year === 'all' ? '全部期間' : year + ' 年');
   html += statCard('平均客單價', '$' + avgOrder.toLocaleString(), '每筆訂單平均');
   html += statCard('活躍月份', monthly.filter(m => m.count > 0).length + ' 個月', '有訂單的月份');
+  html += statCard('商品成本', '$' + Math.round(totalCost).toLocaleString(), knownRevenue > 0 ? '已設定成本的品項' : '尚無完整成本資料');
+  html += statCard('毛利', '$' + Math.round(grossProfit).toLocaleString(), '實收減商品成本');
+  html += statCard('毛利率', marginRate.toFixed(1) + '%', knownRevenue > 0 ? '依已設定成本品項計算' : '尚無完整成本資料');
   html += '</div>';
+
+  if (missingItems > 0) {
+    html += '<div style="margin:-8px 0 20px;padding:12px 16px;border:1px solid #e6c86e;background:#fff8df;border-radius:10px;color:#705a16;font-size:13px;">'
+      + '尚有 ' + missingItems + ' 筆品項缺少成本快照，以上成本與毛利只計算資料完整的品項；舊訂單不會套用目前成本。'
+      + '</div>';
+  }
+
+  const costMappings = Array.isArray(reportData.costMappings) ? reportData.costMappings : [];
+  const missingMappings = costMappings.filter(function(item) { return !item.matched && item.category !== '客製'; });
+  if (missingMappings.length > 0) {
+    html += '<div style="margin:-8px 0 20px;padding:12px 16px;border:1px solid #e6c86e;background:#fff8df;border-radius:10px;color:#705a16;font-size:13px;">'
+      + '<b>尚未建立成本配方：</b>' + missingMappings.map(function(item) { return item.name; }).join('、')
+      + '<br><span style="font-size:12px;">請按右上角「成本設定」，選擇商品並填入每盆用量。</span></div>';
+  }
 
   // 年度長條圖（全部年份時顯示）
   if (year === 'all' && reportData.yearly.length > 0) {
@@ -865,12 +1038,18 @@ function renderReport(year) {
   // 熱銷商品（獨立區塊）
   html += '<div class="section" style="margin-bottom:20px;">';
   html += '<div class="section-header"><span>🏆</span>熱銷商品 Top 10</div>';
-  html += '<table><thead><tr><th>商品</th><th class="right">數量</th><th class="right">金額</th></tr></thead><tbody>';
+  html += '<table><thead><tr><th>商品</th><th class="right">數量</th><th class="right">實收</th><th class="right">成本</th><th class="right">毛利</th><th class="right">毛利率</th></tr></thead><tbody>';
   products.forEach(function(p, i) {
     const rc = i < 3 ? 'rank-'+(i+1) : '';
+    const profit = (p.knownRevenue || 0) - (p.cost || 0);
+    const rate = (p.knownRevenue || 0) > 0 ? profit / p.knownRevenue * 100 : 0;
+    const incomplete = (p.missingItems || 0) > 0;
     html += '<tr><td><span class="rank ' + rc + '">' + (i+1) + '</span>' + p.name + '</td>';
     html += '<td class="right">' + p.qty + ' 盆</td>';
-    html += '<td class="right amount">$' + p.amount.toLocaleString() + '</td></tr>';
+    html += '<td class="right amount">$' + p.amount.toLocaleString() + '</td>';
+    html += '<td class="right">' + ((p.knownRevenue || 0) > 0 || (p.cost || 0) > 0 ? '$' + Math.round(p.cost || 0).toLocaleString() : '—') + '</td>';
+    html += '<td class="right">' + ((p.knownRevenue || 0) > 0 ? '$' + Math.round(profit).toLocaleString() : '—') + '</td>';
+    html += '<td class="right">' + ((p.knownRevenue || 0) > 0 ? rate.toFixed(1) + '%' : '—') + (incomplete ? '<br><span style="font-size:10px;color:#b7791f;">部分缺成本</span>' : '') + '</td></tr>';
   });
   html += '</tbody></table></div>';
 
@@ -980,9 +1159,13 @@ function orderDetailHtml(order) {
     var original = askingPrice * qty;
     var dealPrice = isBargain ? Math.max(0, Number(item.dealPrice) >= 0 ? Number(item.dealPrice) : askingPrice) : price - discount;
     var net = dealPrice * qty;
+    var hasCost = item.costComplete === true && item.unitCost !== null && isFinite(Number(item.unitCost));
+    var cost = hasCost ? Math.max(0, Number(item.unitCost)) * qty : 0;
     var text = item.name + ' x' + qty + ' ($' + original.toLocaleString() + ')';
     if (isBargain) text += '<br><span style="color:var(--red);">↳ 折扣 -$' + (Math.max(0, askingPrice - dealPrice) * qty).toLocaleString() + '，本項實收 $' + net.toLocaleString() + '</span>';
     else if (discount > 0) text += '<br><span style="color:var(--red);">↳ 自取優惠 每盆-$' + discount.toLocaleString() + '，本項實收 $' + net.toLocaleString() + '</span>';
+    if (hasCost) text += '<br><span style="color:var(--green2);">↳ 成本 $' + cost.toLocaleString() + '，毛利 $' + (net - cost).toLocaleString() + '</span>';
+    else text += '<br><span style="color:var(--ink3);">↳ 成本未設定</span>';
     return text;
   }).join('<br>');
 }
