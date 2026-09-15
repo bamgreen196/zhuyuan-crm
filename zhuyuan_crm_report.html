@@ -309,6 +309,9 @@
   .cost-pot-option:last-child { border-bottom:0; }
   .cost-pot-option:hover { background:var(--green3); }
   .cost-pot-option input { width:18px; height:18px; accent-color:var(--green); flex:none; }
+  .cost-pot-option .pot-label { flex:1; }
+  .cost-pot-option .pot-estimate { width:105px; padding:6px 7px; border:1px solid #e0b95b; border-radius:7px; text-align:right; font:inherit; background:#fffaf0; }
+  .cost-preview-note { font-size:12px; color:#a36b00; margin-top:7px; line-height:1.6; }
 
   .customer-link {
     cursor: pointer;
@@ -647,9 +650,9 @@ function loadSelectedRecipe() {
   });
   const savedPots = Array.isArray(recipe.pots) ? recipe.pots : (recipe.pot ? [recipe.pot] : []), savedPotSkus = savedPots.map(function(p){return p.sku;});
   html += '<div class="cost-material-title">盆器（可複選，成本取平均）</div><div class="cost-form-row"><input id="cost-pot-search" class="cost-select" type="search" placeholder="輸入品名、顏色或 SKU 搜尋" oninput="filterCostPots()" style="margin-bottom:8px;"><div id="cost-pot-list" class="cost-pot-list">';
-  (costSetupData.pots || []).forEach(function(p, i){ html += '<label class="cost-pot-option" data-search="' + escapeHtml((p.label+' '+p.sku).toLowerCase()) + '"><input class="cost-pot-check" type="checkbox" value="' + i + '"' + (savedPotSkus.indexOf(p.sku)>=0 ? ' checked' : '') + ' onchange="updateCostPreview()"><span>' + escapeHtml(p.label) + '｜$' + Number(p.price).toLocaleString() + '｜庫存 ' + p.stock + '</span></label>'; });
+  (costSetupData.pots || []).forEach(function(p, i){ const savedPot=savedPots.find(function(x){return x.sku===p.sku;}); const noPrice=!(Number(p.price)>0); html += '<div class="cost-pot-option" data-search="' + escapeHtml((p.label+' '+p.sku).toLowerCase()) + '"><input class="cost-pot-check" type="checkbox" value="' + i + '"' + (savedPot ? ' checked' : '') + ' onchange="updateCostPreview()"><span class="pot-label">' + escapeHtml(p.label) + '｜' + (noPrice?'<b style="color:#b7791f;">價格未設定</b>':'$'+Number(p.price).toLocaleString()) + '｜庫存 ' + p.stock + '</span>' + (noPrice?'<input class="pot-estimate" data-sku="'+escapeHtml(p.sku)+'" type="number" min="0" step="0.01" inputmode="decimal" value="'+(savedPot&&Number(savedPot.estimate)>0?Number(savedPot.estimate):'')+'" placeholder="暫估單價" oninput="updateCostPreview()">':'') + '</div>'; });
   html += '</div></div>';
-  html += '<div class="cost-preview"><span>目前每盆成本</span><strong id="cost-preview-value">$0</strong></div><button id="cost-save" class="cost-save" onclick="saveCostRecipe()">儲存成本配方</button><div id="cost-save-msg" style="font-size:13px;text-align:center;margin-top:8px;color:var(--ink2);"></div>';
+  html += '<div class="cost-preview"><span>目前每盆成本</span><strong id="cost-preview-value">$0</strong></div><div id="cost-preview-note" class="cost-preview-note"></div><button id="cost-save" class="cost-save" onclick="saveCostRecipe()">儲存成本配方</button><div id="cost-save-msg" style="font-size:13px;text-align:center;margin-top:8px;color:var(--ink2);"></div>';
   editor.innerHTML = html; updateCostPreview();
 }
 function normalizeMaterialQty(input) {
@@ -662,15 +665,17 @@ function filterCostPots() {
 }
 function collectCostRecipe() {
   const materials = Array.from(document.querySelectorAll('.material-qty')).map(function(input){ const qty=Number(input.value)||0; return {name:input.dataset.name, qty:input.dataset.whole==='1'?Math.floor(qty):qty}; }).filter(function(m){ return m.qty > 0; });
-  const pots = Array.from(document.querySelectorAll('.cost-pot-check:checked')).map(function(input){ const p=costSetupData.pots[Number(input.value)]; return {sku:p.sku,name:p.label}; });
+  const pots = Array.from(document.querySelectorAll('.cost-pot-check:checked')).map(function(input){ const p=costSetupData.pots[Number(input.value)], estimateInput=input.closest('.cost-pot-option').querySelector('.pot-estimate'); return {sku:p.sku,name:p.label,estimate:estimateInput?(Number(estimateInput.value)||0):0}; });
   return { materials:materials, pots:pots };
 }
 function updateCostPreview() {
   if (!costSetupData || !document.getElementById('cost-preview-value')) return;
   const recipe = collectCostRecipe(); let total = 0;
   recipe.materials.forEach(function(m){ const src = costSetupData.materials.find(function(x){return x.name===m.name;}); if(src) total += src.price*m.qty; });
-  if (recipe.pots.length) { let potTotal=0; recipe.pots.forEach(function(selected){ const pot=costSetupData.pots.find(function(x){return x.sku===selected.sku;}); if(pot) potTotal+=pot.price; }); total += potTotal/recipe.pots.length; }
+  let missing=[],estimated=[];
+  if (recipe.pots.length) { let potTotal=0,valid=0; recipe.pots.forEach(function(selected){ const pot=costSetupData.pots.find(function(x){return x.sku===selected.sku;}); if(pot&&Number(pot.price)>0){potTotal+=Number(pot.price);valid++;}else if(Number(selected.estimate)>0){potTotal+=Number(selected.estimate);valid++;estimated.push(selected.name);}else{missing.push(selected.name);} }); if(valid) total += potTotal/valid; }
   document.getElementById('cost-preview-value').textContent = '$' + Math.round(total * 100) / 100;
+  const note=document.getElementById('cost-preview-note'); if(note) note.textContent = missing.length ? '尚缺價格：'+missing.join('、')+'。目前金額只供參考，補齊前不列入正式毛利。' : (estimated.length ? '含暫估盆器：'+estimated.join('、')+'；庫存正式價格補上後會自動取代。' : '');
 }
 async function saveCostRecipe() {
   const product = selectedCostProduct(), button = document.getElementById('cost-save'), msg = document.getElementById('cost-save-msg');
@@ -680,8 +685,8 @@ async function saveCostRecipe() {
   try {
     const url = API_URL + '?action=saveProductRecipeGet&category=' + encodeURIComponent(product.category) + '&name=' + encodeURIComponent(product.name) + '&recipe=' + encodeURIComponent(JSON.stringify(recipe)) + '&_=' + Date.now();
     const result = await fetchApiJsonUrl(url, 3);
-    msg.textContent = '已儲存，每盆成本 $' + Number(result.unitCost).toLocaleString();
-    const old = selectedRecipeFor(product), next = {category:product.category,name:product.name,recipe:recipe,unitCost:result.unitCost,complete:true,updatedAt:result.updatedAt};
+    msg.textContent = result.complete ? '已儲存，每盆成本 $' + Number(result.unitCost).toLocaleString() + ((result.estimated||[]).length?'（含暫估）':'') : '配方已儲存；尚缺價格：' + (result.missing||[]).join('、');
+    const old = selectedRecipeFor(product), next = {category:product.category,name:product.name,recipe:recipe,unitCost:result.unitCost,complete:result.complete,missing:result.missing||[],estimated:result.estimated||[],updatedAt:result.updatedAt};
     if (old) Object.assign(old,next); else costSetupData.recipes.push(next);
   } catch (error) { msg.textContent = '儲存失敗：' + error.message; }
   finally { button.disabled = false; button.textContent = '儲存成本配方'; }
