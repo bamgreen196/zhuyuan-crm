@@ -307,16 +307,38 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 
 <script>
 // ── API 設定 ──
-let API_URL = localStorage.getItem('potMobileApiUrl') || 'https://script.google.com/macros/s/AKfycbykFf-hEqrgtNmVBfhYUxmANwc2cRNBeVJU2K0iHWMP0VXflxzu11Pq1VJWoTUUXFOBAQ/exec';
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbz0g9G-oJ2EuxvlTHoz_gUfY_D3Gg38Yf95KNdeuenRYQraVFL2-lc4ZBf0aQxGVokBzw/exec';
+let API_URL = localStorage.getItem('potMobileApiUrl') || DEFAULT_API_URL;
 let allItems = [];
 let bambooSizes = [], accessories = [];
 
 // ── API 呼叫 ──
+function waitMs(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+async function fetchJsonGet(url, attempts = 3, onRetry) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 35000);
+    try {
+      const res = await fetch(url, { cache:'no-store', signal:controller.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (!data || typeof data !== 'object') throw new Error('回傳資料格式錯誤');
+      return data;
+    } catch (e) {
+      lastError = e && e.name === 'AbortError' ? new Error('連線逾時') : e;
+      if (attempt >= attempts) break;
+      if (onRetry) onRetry(attempt + 1, attempts, lastError);
+      await waitMs(900 * attempt);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastError || new Error('連線失敗');
+}
 async function apiGet(action) {
   if (!API_URL) throw new Error('請先在設定頁輸入 Apps Script 網址');
-  const res = await fetch(API_URL + '?action=' + action);
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return await res.json();
+  return fetchJsonGet(API_URL + '?action=' + encodeURIComponent(action));
 }
 
 
@@ -406,8 +428,9 @@ async function saveAndTest() {
   const statusEl = document.getElementById('connStatus');
   statusEl.innerHTML = '<span class="conn-status" style="background:var(--yellow-l);color:#856404;">⏳ 測試中...</span>';
   try {
-    const res = await fetch(url + '?action=getItems');
-    const data = await res.json();
+    const data = await fetchJsonGet(url + '?action=getItems', 3, (attempt, total) => {
+      statusEl.innerHTML = '<span class="conn-status" style="background:var(--yellow-l);color:#856404;">⏳ 連線較慢，正在重試（' + attempt + '/' + total + '）...</span>';
+    });
     if (data.success) {
       API_URL = url;
       localStorage.setItem('potMobileApiUrl', url);
