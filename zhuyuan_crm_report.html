@@ -599,19 +599,32 @@ function loadSelectedRecipe() {
     const list = (costSetupData.materials || []).filter(function(m){ return m.group === group; });
     if (!list.length) return;
     html += '<div class="cost-material-title">' + group + '用量（每盆）</div>';
-    list.forEach(function(m){ html += '<div class="cost-material-row"><span>' + escapeHtml(m.name) + '</span><input class="material-qty" data-name="' + escapeHtml(m.name) + '" data-price="' + m.price + '" type="number" min="0" step="0.01" value="' + (qtyMap[m.name] || '') + '" placeholder="0" oninput="updateCostPreview()"><span>$' + Number(m.price).toLocaleString() + '/' + escapeHtml(m.unit || '單位') + '</span></div>'; });
+    list.forEach(function(m){ const whole = group === '竹子'; html += '<div class="cost-material-row"><span>' + escapeHtml(m.name) + '</span><input class="material-qty" data-name="' + escapeHtml(m.name) + '" data-price="' + m.price + '" data-whole="' + (whole ? '1' : '0') + '" type="number" min="0" step="' + (whole ? '1' : '0.01') + '" inputmode="' + (whole ? 'numeric' : 'decimal') + '" value="' + (qtyMap[m.name] || '') + '" placeholder="0" oninput="normalizeMaterialQty(this);updateCostPreview()"><span>$' + Number(m.price).toLocaleString() + '/' + escapeHtml(m.unit || '單位') + '</span></div>'; });
   });
-  html += '<div class="cost-material-title">盆器</div><div class="cost-form-row"><select id="cost-pot" class="cost-select" onchange="updateCostPreview()"><option value="">不使用盆器</option>';
+  html += '<div class="cost-material-title">盆器（每盆固定使用 1 個）</div><div class="cost-form-row"><input id="cost-pot-search" class="cost-select" type="search" placeholder="輸入品名、顏色或 SKU 搜尋" oninput="filterCostPots()" style="margin-bottom:8px;"><select id="cost-pot" class="cost-select" onchange="updateCostPreview()"><option value="">不使用盆器</option>';
   (costSetupData.pots || []).forEach(function(p, i){ html += '<option value="' + i + '"' + (recipe.pot && recipe.pot.sku === p.sku ? ' selected' : '') + '>' + escapeHtml(p.label) + '｜$' + Number(p.price).toLocaleString() + '｜庫存 ' + p.stock + '</option>'; });
-  html += '</select></div><div class="cost-form-row"><label>每盆使用盆器數量</label><input id="cost-pot-qty" class="cost-select" type="number" min="0" step="0.01" value="' + (recipe.pot ? Number(recipe.pot.qty) || 1 : 1) + '" oninput="updateCostPreview()"></div>';
+  html += '</select></div>';
   html += '<div class="cost-preview"><span>目前每盆成本</span><strong id="cost-preview-value">$0</strong></div><button id="cost-save" class="cost-save" onclick="saveCostRecipe()">儲存成本配方</button><div id="cost-save-msg" style="font-size:13px;text-align:center;margin-top:8px;color:var(--ink2);"></div>';
   editor.innerHTML = html; updateCostPreview();
 }
+function normalizeMaterialQty(input) {
+  if (input.dataset.whole !== '1' || input.value === '') return;
+  input.value = String(Math.max(0, Math.floor(Number(input.value) || 0)));
+}
+function filterCostPots() {
+  const select = document.getElementById('cost-pot'), keyword = String(document.getElementById('cost-pot-search').value || '').trim().toLowerCase();
+  const selected = select.value;
+  Array.from(select.options).forEach(function(option, index) {
+    option.hidden = index > 0 && keyword && option.textContent.toLowerCase().indexOf(keyword) < 0;
+  });
+  if (selected && select.selectedOptions[0] && select.selectedOptions[0].hidden) select.value = '';
+  updateCostPreview();
+}
 function collectCostRecipe() {
-  const materials = Array.from(document.querySelectorAll('.material-qty')).map(function(input){ return {name:input.dataset.name, qty:Number(input.value)||0}; }).filter(function(m){ return m.qty > 0; });
+  const materials = Array.from(document.querySelectorAll('.material-qty')).map(function(input){ const qty=Number(input.value)||0; return {name:input.dataset.name, qty:input.dataset.whole==='1'?Math.floor(qty):qty}; }).filter(function(m){ return m.qty > 0; });
   const potSelect = document.getElementById('cost-pot'), potIndex = potSelect && potSelect.value !== '' ? Number(potSelect.value) : -1;
   const p = potIndex >= 0 ? costSetupData.pots[potIndex] : null;
-  return { materials:materials, pot:p ? {sku:p.sku,name:p.label,qty:Number(document.getElementById('cost-pot-qty').value)||0} : null };
+  return { materials:materials, pot:p ? {sku:p.sku,name:p.label,qty:1} : null };
 }
 function updateCostPreview() {
   if (!costSetupData || !document.getElementById('cost-preview-value')) return;
