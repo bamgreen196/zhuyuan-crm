@@ -581,7 +581,7 @@ async function fetchApiJsonUrl(url, attempts) {
   let lastError; attempts = attempts || 3;
   for (let attempt=0; attempt<attempts; attempt++) {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeoutId = setTimeout(function(){ if (controller) controller.abort(); }, 12000);
+    const timeoutId = setTimeout(function(){ if (controller) controller.abort(); }, 30000);
     try {
       const response = await fetch(url + (url.indexOf('?')>=0?'&':'?') + '_=' + Date.now(), {
         cache:'no-store', redirect:'follow', signal: controller ? controller.signal : undefined
@@ -605,7 +605,7 @@ function fetchApiJsonp(action) {
   return new Promise(function(resolve, reject) {
     const callbackName = '__zhuJsonp' + Date.now() + Math.random().toString(36).slice(2);
     const script = document.createElement('script');
-    const timeoutId = setTimeout(function(){ cleanup(); reject(new Error('備援讀取逾時')); }, 15000);
+    const timeoutId = setTimeout(function(){ cleanup(); reject(new Error('備援讀取逾時')); }, 30000);
     function cleanup() {
       clearTimeout(timeoutId);
       if (script.parentNode) script.parentNode.removeChild(script);
@@ -936,11 +936,10 @@ async function loadReport() {
   const area = document.getElementById('report-area');
   area.innerHTML = '<div class="loading dot-anim">載入中</div>';
   try {
-    const bundle = await fetchApiJson('getReportBundle');
-    if (!bundle || !bundle.report || !Array.isArray(bundle.orders)) throw new Error('報表資料格式不正確');
-    reportData = bundle.report;
-    const allOrders = bundle.orders;
-    allOrdersCache = allOrders;
+    // 首頁只取體積較小的統計資料，先讓畫面顯示；訂單明細在背景載入。
+    reportData = await fetchApiJson('getReport');
+    if (!reportData || !Array.isArray(reportData.monthly)) throw new Error('報表資料格式不正確');
+    allOrdersCache = null;
 
     const years = [...new Set(reportData.monthly.map(m => m.month.slice(0,4)))].sort().reverse();
     const sel = document.getElementById('year-select');
@@ -963,8 +962,12 @@ async function loadReport() {
     if (years.length >= 1) cmpA.value = years[0];
     if (years.length >= 2) cmpB.value = years[1];
     reportData._allCustomersRaw = reportData.customers;
-    reportData.customers = buildAllCustomersWithDate(reportData.customers, allOrders);
+    reportData.customers = buildAllCustomersWithDate(reportData.customers, []);
     renderReport('all');
+    // 明細失敗不影響主報表；使用者打開月份或客戶明細時會自動再試。
+    getAllOrdersCached().then(function(orders) {
+      reportData.customers = buildAllCustomersWithDate(reportData._allCustomersRaw, orders);
+    }).catch(function(){});
     setTimeout(preloadCostSetup, 300);
   } catch(e) {
     area.innerHTML = '<div class="loading">載入失敗：' + e.message + '</div>';
@@ -1429,13 +1432,17 @@ function closeModal(e) {
 
 // ── 客戶搜尋 ──
 let allOrdersCache = null;
+let allOrdersPromise = null;
 
 async function getAllOrdersCached() {
   if (allOrdersCache) return allOrdersCache;
-  const data = await fetchApiJson('getAllOrders');
-  if (!Array.isArray(data)) throw new Error('資料格式錯誤');
-  allOrdersCache = data;
-  return allOrdersCache;
+  if (allOrdersPromise) return allOrdersPromise;
+  allOrdersPromise = fetchApiJson('getAllOrders').then(function(data) {
+    if (!Array.isArray(data)) throw new Error('資料格式錯誤');
+    allOrdersCache = data;
+    return allOrdersCache;
+  }).finally(function(){ allOrdersPromise = null; });
+  return allOrdersPromise;
 }
 
 async function searchCustomer() {
