@@ -617,7 +617,7 @@ function fetchApiJsonp(action) {
       else resolve(data);
     };
     script.onerror = function(){ cleanup(); reject(new Error('備援讀取失敗')); };
-    script.src = API_URL + '?action=' + encodeURIComponent(action) + '&callback=' + encodeURIComponent(callbackName) + '&_=' + Date.now();
+    script.src = API_URL + '?action=' + encodeURIComponent(action) + '&prefix=' + encodeURIComponent(callbackName) + '&_=' + Date.now();
     document.head.appendChild(script);
   });
 }
