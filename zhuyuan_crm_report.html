@@ -580,8 +580,12 @@ function closeCostModal(event) { if (!event || event.target === document.getElem
 async function fetchApiJsonUrl(url, attempts) {
   let lastError; attempts = attempts || 3;
   for (let attempt=0; attempt<attempts; attempt++) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = setTimeout(function(){ if (controller) controller.abort(); }, 12000);
     try {
-      const response = await fetch(url + (url.indexOf('?')>=0?'&':'?') + '_=' + Date.now(), {cache:'no-store',redirect:'follow'});
+      const response = await fetch(url + (url.indexOf('?')>=0?'&':'?') + '_=' + Date.now(), {
+        cache:'no-store', redirect:'follow', signal: controller ? controller.signal : undefined
+      });
       const text = await response.text();
       if (!response.ok) throw new Error('伺服器錯誤 HTTP ' + response.status);
       if (/^\s*</.test(text)) throw new Error('Google 暫時回傳登入或中介頁');
@@ -589,13 +593,41 @@ async function fetchApiJsonUrl(url, attempts) {
       if (data && data.error) throw new Error(data.error);
       return data;
     } catch (error) {
-      lastError=error;
+      lastError = error && error.name === 'AbortError' ? new Error('伺服器回應逾時') : error;
       if (attempt<attempts-1) await new Promise(function(resolve){setTimeout(resolve,700*(attempt+1));});
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
   throw lastError || new Error('無法讀取資料');
 }
-function fetchApiJson(action) { return fetchApiJsonUrl(API_URL + '?action=' + encodeURIComponent(action), 3); }
+function fetchApiJsonp(action) {
+  return new Promise(function(resolve, reject) {
+    const callbackName = '__zhuJsonp' + Date.now() + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const timeoutId = setTimeout(function(){ cleanup(); reject(new Error('備援讀取逾時')); }, 15000);
+    function cleanup() {
+      clearTimeout(timeoutId);
+      if (script.parentNode) script.parentNode.removeChild(script);
+      try { delete window[callbackName]; } catch (error) { window[callbackName] = undefined; }
+    }
+    window[callbackName] = function(data) {
+      cleanup();
+      if (data && data.error) reject(new Error(data.error));
+      else resolve(data);
+    };
+    script.onerror = function(){ cleanup(); reject(new Error('備援讀取失敗')); };
+    script.src = API_URL + '?action=' + encodeURIComponent(action) + '&callback=' + encodeURIComponent(callbackName) + '&_=' + Date.now();
+    document.head.appendChild(script);
+  });
+}
+async function fetchApiJson(action) {
+  try {
+    return await fetchApiJsonUrl(API_URL + '?action=' + encodeURIComponent(action), 1);
+  } catch (error) {
+    return fetchApiJsonp(action);
+  }
+}
 async function openCostSetup() {
   document.getElementById('cost-modal').classList.add('open');
   document.getElementById('cost-source-status').className = 'cost-source-status';
