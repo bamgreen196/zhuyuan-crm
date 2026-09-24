@@ -430,11 +430,19 @@ let bargainingMode = false;
 // ── 離線佇列（B方案）──
 const QUEUE_KEY = 'zhuOrderQueue';
 function newClientOrderId() { return 'WEB-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10); }
+function formatOrderDate(value) {
+  const date = value instanceof Date ? value : new Date(value || Date.now());
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth()+1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
 function getQueue() {
   let rows; try { rows = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch(e) { rows = []; }
   if (!Array.isArray(rows)) rows = [];
   let changed = false;
-  rows.forEach(order => { if (!order.clientOrderId) { order.clientOrderId = newClientOrderId(); changed = true; } });
+  rows.forEach(order => {
+    if (!order.clientOrderId) { order.clientOrderId = newClientOrderId(); changed = true; }
+    if (!order.date && order._queuedAt) { order.date = formatOrderDate(order._queuedAt); changed = true; }
+  });
   if (changed) localStorage.setItem(QUEUE_KEY, JSON.stringify(rows));
   return rows;
 }
@@ -460,7 +468,7 @@ async function uploadQueue() {
   const remaining = [];
   for (const order of q) {
     try {
-      const res = await apiPost({ action: 'saveOrder', clientOrderId: order.clientOrderId, customerId: order.customerId, customerName: order.customerName, items: order.items, totalQty: order.totalQty, totalAmount: order.totalAmount });
+      const res = await apiPost({ action: 'saveOrder', clientOrderId: order.clientOrderId, orderDate: order.date, customerId: order.customerId, customerName: order.customerName, items: order.items, totalQty: order.totalQty, totalAmount: order.totalAmount });
       if (!res || !res.success) remaining.push(order);
     } catch(e) { remaining.push(order); }
   }
@@ -576,6 +584,7 @@ async function apiPost(payload) {
       const url = API_URL
         + '?action=saveOrderGet'
         + '&clientOrderId=' + encodeURIComponent(payload.clientOrderId || '')
+        + '&orderDate=' + encodeURIComponent(payload.orderDate || '')
         + '&customerId=' + encodeURIComponent(payload.customerId)
         + '&customerName=' + encodeURIComponent(payload.customerName)
         + '&totalQty=' + payload.totalQty
@@ -1064,6 +1073,7 @@ async function completeOrder() {
     totalQty,
     totalAmount,
     clientOrderId: newClientOrderId(),
+    date: formatOrderDate(new Date()),
     pricingMode: bargainingMode ? 'bargain' : 'regular'
   };
 
@@ -1250,7 +1260,7 @@ async function completeAndSave() {
     if (online) {
       try {
         const res = await Promise.race([
-          apiPost({ action: 'saveOrder', clientOrderId: order.clientOrderId, customerId: order.customerId, customerName: order.customerName, items: order.items, totalQty: order.totalQty, totalAmount: order.totalAmount }),
+          apiPost({ action: 'saveOrder', clientOrderId: order.clientOrderId, orderDate: order.date, customerId: order.customerId, customerName: order.customerName, items: order.items, totalQty: order.totalQty, totalAmount: order.totalAmount }),
           new Promise(resolve => setTimeout(() => resolve(null), 15000))
         ]);
         if (!res || !res.success) online = false;
@@ -1932,8 +1942,8 @@ async function syncAll() {
   badge.textContent = '同步中...';
   try {
     const [pr, cr] = await Promise.all([
-      fetch(API_URL + '?action=getProducts').then(r => r.json()),
-      fetch(API_URL + '?action=getCustomers').then(r => r.json()),
+      fetchApiJsonWithRetry(API_URL + '?action=getProducts', 30000, 2),
+      fetchApiJsonWithRetry(API_URL + '?action=getCustomers', 30000, 2),
     ]);
     if (Array.isArray(pr)) { products = pr; localStorage.setItem('zhuProducts', JSON.stringify(products)); }
     if (Array.isArray(cr)) {
