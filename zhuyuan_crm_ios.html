@@ -563,6 +563,7 @@ async function fetchProducts() {
     if (Array.isArray(data) && data.length) {
       products = data;
       localStorage.setItem('zhuProducts', JSON.stringify(products));
+      if (currentStep === 1) renderCategories();
     }
   } catch(e) {}
 }
@@ -1945,7 +1946,11 @@ async function syncAll() {
       fetchApiJsonWithRetry(API_URL + '?action=getProducts', 30000, 2),
       fetchApiJsonWithRetry(API_URL + '?action=getCustomers', 30000, 2),
     ]);
-    if (Array.isArray(pr)) { products = pr; localStorage.setItem('zhuProducts', JSON.stringify(products)); }
+    if (Array.isArray(pr)) {
+      products = pr;
+      localStorage.setItem('zhuProducts', JSON.stringify(products));
+      if (currentStep === 1) renderCategories();
+    }
     if (Array.isArray(cr)) {
       // 強制用 Sheets 的資料覆蓋本地，確保次數正確
       customers = cr;
