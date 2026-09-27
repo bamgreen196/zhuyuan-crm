@@ -172,6 +172,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 
   <!-- ══ 庫存查詢 ══ -->
   <div id="stockPage" class="page active">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button class="btn btn-gray btn-sm" onclick="loadStock()">↻ 手動更新庫存</button></div>
     <div class="search-bar">
       <input type="text" id="stockKw" placeholder="搜尋品名、顏色、廠商..." autocomplete="off"
         oninput="filterStock()" autocorrect="off" autocapitalize="off" spellcheck="false">
@@ -186,7 +187,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
       <div style="font-size:17px;font-weight:700;color:#2d7d46;">今日出庫記錄</div>
-      <div id="logStatus" style="font-size:12px;color:#888;">載入中...</div>
+      <div style="display:flex;align-items:center;gap:8px;"><div id="logStatus" style="font-size:12px;color:#888;">尚未更新</div><button class="btn btn-gray btn-sm" onclick="loadLog()">↻ 手動更新</button></div>
     </div>
     <div id="latestCard" style="display:none;background:#e8f5ec;border-radius:10px;padding:12px 14px;border-left:3px solid #2d7d46;margin-bottom:14px;">
       <div style="font-size:11px;color:#2d7d46;margin-bottom:4px;font-weight:600;">最新一筆</div>
@@ -197,7 +198,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
     <div id="logList"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid #e0e0e0;">
       <div id="logTotal" style="font-size:13px;color:#666;"></div>
-      <button class="btn btn-gray btn-sm" onclick="loadLog()">手動更新</button>
+      <button class="btn btn-gray btn-sm" onclick="loadLog()">↻ 手動更新</button>
     </div>
   </div>
 </div>
@@ -355,7 +356,7 @@ function switchPage(id, btn) {
   if (id === 'stockPage')   loadStock();
   if (id === 'costPage')    initCostPage();
   if (id === 'settingPage') loadSettings();
-  if (id === 'logPage')     { startLogPolling(); loadLog(); }
+  if (id === 'logPage')     loadLog();
   else stopLogPolling();
 }
 
@@ -689,7 +690,7 @@ async function apiPost(action,data) {
   return response.json();
 }
 let logBusyV2=false,logTicketV2=0,lastLogSuccessV2='';
-function startLogPolling() { stopLogPolling();_logTimer=setInterval(()=>{if(!document.hidden)loadLog();},15000); }
+function startLogPolling() { stopLogPolling(); }
 function stopLogPolling() { if(_logTimer)clearInterval(_logTimer);_logTimer=null;++logTicketV2; }
 async function loadLog() {
   if(logBusyV2)return;logBusyV2=true;
@@ -771,8 +772,7 @@ async function loadStock() {
   let status=document.getElementById('stockStatusV2');
   if(!status){
     const wrap=document.createElement('div');status=document.createElement('span');status.id='stockStatusV2';
-    const b=document.createElement('button');b.className='btn btn-gray btn-sm';b.textContent='更新庫存';b.onclick=loadStock;
-    wrap.append(status,b);list.before(wrap);
+    wrap.append(status);list.before(wrap);
   }
   try{
     status.textContent=cached?'顯示上次資料，更新中…　':'載入中…　';const r=await apiGet('getItems');
