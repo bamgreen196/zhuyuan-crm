@@ -314,11 +314,11 @@ let bambooSizes = [], accessories = [];
 
 // ── API 呼叫 ──
 function waitMs(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-async function fetchJsonGet(url, attempts = 3, onRetry) {
+async function fetchJsonGet(url, attempts = 2, onRetry) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 35000);
+    const timer = setTimeout(() => controller.abort(), 20000);
     try {
       const res = await fetch(url, { cache:'no-store', signal:controller.signal });
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -336,10 +336,13 @@ async function fetchJsonGet(url, attempts = 3, onRetry) {
   }
   throw lastError || new Error('連線失敗');
 }
-async function apiGet(action) {
+async function apiGet(action, params) {
   if (!API_URL) throw new Error('請先在設定頁輸入 Apps Script 網址');
-  return fetchJsonGet(API_URL + '?action=' + encodeURIComponent(action));
+  const query=new URLSearchParams({action,...(params||{}),_ts:String(Date.now())});
+  return fetchJsonGet(API_URL + '?' + query.toString());
 }
+function mobileCacheReadV8(key){try{return JSON.parse(localStorage.getItem('pot-mobile-cache-v8:'+key)||'null');}catch(e){return null;}}
+function mobileCacheWriteV8(key,value){try{localStorage.setItem('pot-mobile-cache-v8:'+key,JSON.stringify({savedAt:Date.now(),value}));}catch(e){}}
 
 
 
@@ -686,28 +689,34 @@ async function apiPost(action,data) {
   return response.json();
 }
 let logBusyV2=false,logTicketV2=0,lastLogSuccessV2='';
-function startLogPolling() { stopLogPolling();_logTimer=setInterval(()=>{if(!document.hidden)loadLog();},5000); }
+function startLogPolling() { stopLogPolling();_logTimer=setInterval(()=>{if(!document.hidden)loadLog();},15000); }
 function stopLogPolling() { if(_logTimer)clearInterval(_logTimer);_logTimer=null;++logTicketV2; }
 async function loadLog() {
   if(logBusyV2)return;logBusyV2=true;
   const ticket=++logTicketV2,status=document.getElementById('logStatus');
-  status.textContent='更新中…';
+  const logCacheKey='today-log:'+scanDayMobileV8(),cached=mobileCacheReadV8(logCacheKey);
+  if(cached&&Array.isArray(cached.value)){renderLog(cached.value,scanDayMobileV8());status.textContent='顯示上次資料，更新中…';}
+  else status.textContent='更新中…';
   try{
     // 使用台北日期，不依手機旅遊時所在時區
     const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
     const p=Object.fromEntries(parts.map(x=>[x.type,x.value])),date=p.year+'/'+p.month+'/'+p.day;
-    const r=await apiGet('getStockLog&date='+encodeURIComponent(date));
+    const r=await apiGet('getStockLog',{date});
     if(!r||!r.success||!Array.isArray(r.items))throw new Error(r&&r.error||'回傳紀錄格式不完整');
     if(ticket!==logTicketV2)return;
-    renderLog(r.items.filter(i=>i.type==='出庫'||i.type==='取消出庫'),date);
+    const items=r.items.filter(i=>i.type==='出庫'||i.type==='取消出庫');renderLog(items,date);mobileCacheWriteV8(logCacheKey,items);
     lastLogSuccessV2=new Date().toLocaleTimeString('zh-TW');
     status.textContent='更新於 '+lastLogSuccessV2;status.style.color='#555';
   }catch(e){
     if(ticket===logTicketV2){
       status.textContent='⚠ 未更新'+(lastLogSuccessV2?'（最後成功 '+lastLogSuccessV2+'）':'')+'：'+e.message;
-      status.style.color='#c0392b';document.getElementById('latestCard').style.display='none';
+      status.style.color='#c0392b';if(!cached)document.getElementById('latestCard').style.display='none';
     }
   }finally{logBusyV2=false;}
+}
+function scanDayMobileV8(){
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+  const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));return p.year+'/'+p.month+'/'+p.day;
 }
 
 function itemTitleV3(i){return String(i.name||'')+(i.color?' / '+i.color:'');}
@@ -753,11 +762,12 @@ async function cancelLog(outId,btn) {
   catch(e){alert('取消尚未確認：'+e.message+'；請使用同一筆重試，不要另取消其他筆。');}
   finally{cancelBusyV2=false;btn.disabled=false;}
 }
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.getElementById('logPage').classList.contains('active'))loadLog();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){logBusyV2=false;if(document.getElementById('logPage').classList.contains('active'))loadLog();if(document.getElementById('stockPage').classList.contains('active'))loadStock();}});
 
 
 async function loadStock() {
-  const list=document.getElementById('stockList');list.textContent='載入中…';
+  const list=document.getElementById('stockList'),cached=mobileCacheReadV8('items');
+  if(cached&&Array.isArray(cached.value)){allItems=cached.value;filterStock();}else list.textContent='載入中…';
   let status=document.getElementById('stockStatusV2');
   if(!status){
     const wrap=document.createElement('div');status=document.createElement('span');status.id='stockStatusV2';
@@ -765,10 +775,10 @@ async function loadStock() {
     wrap.append(status,b);list.before(wrap);
   }
   try{
-    const r=await apiGet('getItems');
+    status.textContent=cached?'顯示上次資料，更新中…　':'載入中…　';const r=await apiGet('getItems');
     if(!r||!r.success||!Array.isArray(r.items))throw new Error(r&&r.error||'資料格式不完整');
-    allItems=r.items;filterStock();status.textContent='更新於 '+new Date().toLocaleTimeString('zh-TW')+'　';
-  }catch(e){allItems=[];list.textContent='載入失敗：'+e.message;status.textContent='⚠ 庫存未更新　';}
+    allItems=r.items;mobileCacheWriteV8('items',allItems);filterStock();status.textContent='更新於 '+new Date().toLocaleTimeString('zh-TW')+'　';
+  }catch(e){if(!cached){allItems=[];list.textContent='載入失敗：'+e.message;}status.textContent='⚠ 未更新，'+(cached?'目前顯示上次資料　':'請再按更新庫存　');}
 }
 function stockDimensionsV3(item) {
   // 沿用電腦版的欄位對應：length=寬、width=深、height=高，單位 cm。
