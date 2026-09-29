@@ -270,19 +270,19 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
     <div class="card">
       <div class="card-title">⚙️ 連線設定</div>
       <div class="form-group">
-        <label class="settings-label">Apps Script 網址</label>
-        <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
-        <div class="settings-hint">從 Apps Script 部署頁面複製網址後貼入</div>
+        <label class="settings-label">正式 Apps Script 網址</label>
+        <div id="apiUrlDisplay" style="padding:12px;background:#f4f6f7;border-radius:8px;font-size:12px;overflow-wrap:anywhere;"></div>
+        <div class="settings-hint">此網址由 GitHub 手機版自動設定，各支手機不需另外輸入。</div>
       </div>
       <div style="display:flex;gap:10px;margin-top:4px;">
-        <button class="btn btn-green" onclick="saveAndTest()">💾 儲存並測試</button>
+        <button class="btn btn-green" onclick="testConnectionV9()">🔌 測試正式連線</button>
       </div>
       <div id="connStatus"></div>
     </div>
     <div class="card">
       <div class="card-title">ℹ️ 關於</div>
       <p style="font-size:15px;color:var(--gray);line-height:1.8;">
-        盆器庫存管理系統 · 手機版<br>
+        盆器庫存管理系統 · 手機版 <b id="mobileVersionV9"></b><br>
         功能：庫存查詢 · 成本計算<br>
         資料來源：Google Sheets
       </p>
@@ -309,7 +309,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 <script>
 // ── API 設定 ──
 const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbz0g9G-oJ2EuxvlTHoz_gUfY_D3Gg38Yf95KNdeuenRYQraVFL2-lc4ZBf0aQxGVokBzw/exec';
-let API_URL = localStorage.getItem('potMobileApiUrl') || DEFAULT_API_URL;
+const MOBILE_VERSION_V9 = 'v20260929.1';
+const API_URL = DEFAULT_API_URL;
+localStorage.removeItem('potMobileApiUrl');
 let allItems = [];
 let bambooSizes = [], accessories = [];
 
@@ -342,8 +344,8 @@ async function apiGet(action, params) {
   const query=new URLSearchParams({action,...(params||{}),_ts:String(Date.now())});
   return fetchJsonGet(API_URL + '?' + query.toString());
 }
-function mobileCacheReadV8(key){try{return JSON.parse(localStorage.getItem('pot-mobile-cache-v8:'+key)||'null');}catch(e){return null;}}
-function mobileCacheWriteV8(key,value){try{localStorage.setItem('pot-mobile-cache-v8:'+key,JSON.stringify({savedAt:Date.now(),value}));}catch(e){}}
+function mobileCacheReadV8(key){try{return JSON.parse(localStorage.getItem('pot-mobile-cache-v9:'+key)||'null');}catch(e){return null;}}
+function mobileCacheWriteV8(key,value){try{localStorage.setItem('pot-mobile-cache-v9:'+key,JSON.stringify({savedAt:Date.now(),value}));}catch(e){}}
 
 
 
@@ -423,21 +425,18 @@ async function loadCostParams() {
 
 // ── 設定 ──
 function loadSettings() {
-  document.getElementById('apiUrlInput').value = API_URL || '';
+  document.getElementById('apiUrlDisplay').textContent = API_URL;
+  document.getElementById('mobileVersionV9').textContent = MOBILE_VERSION_V9;
 }
 
-async function saveAndTest() {
-  const url = document.getElementById('apiUrlInput').value.trim();
-  if (!url) { alert('請輸入網址'); return; }
+async function testConnectionV9() {
   const statusEl = document.getElementById('connStatus');
   statusEl.innerHTML = '<span class="conn-status" style="background:var(--yellow-l);color:#856404;">⏳ 測試中...</span>';
   try {
-    const data = await fetchJsonGet(url + '?action=getItems', 3, (attempt, total) => {
+    const data = await fetchJsonGet(API_URL + '?action=getItems&_ts=' + Date.now(), 2, (attempt, total) => {
       statusEl.innerHTML = '<span class="conn-status" style="background:var(--yellow-l);color:#856404;">⏳ 連線較慢，正在重試（' + attempt + '/' + total + '）...</span>';
     });
     if (data.success) {
-      API_URL = url;
-      localStorage.setItem('potMobileApiUrl', url);
       statusEl.innerHTML = '<span class="conn-status conn-ok">✅ 連線成功！共 ' + data.items.length + ' 筆品項</span>';
       allItems = data.items;
     } else {
@@ -450,10 +449,7 @@ async function saveAndTest() {
 
 // ── 初始化 ──
 window.onload = () => {
-  if (API_URL) loadStock();
-  else {
-    document.getElementById('stockList').innerHTML = '<div class="empty-state"><div class="icon">⚙️</div><p>請先點右下角「設定」輸入 Apps Script 網址</p></div>';
-  }
+  loadStock();
 };
 
 // ── 出庫記錄 ──
