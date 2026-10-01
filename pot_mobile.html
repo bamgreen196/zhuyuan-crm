@@ -172,7 +172,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 
   <!-- ══ 庫存查詢 ══ -->
   <div id="stockPage" class="page active">
-    <div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button class="btn btn-gray btn-sm" onclick="loadStock()">↻ 手動更新庫存</button></div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button class="btn btn-gray btn-sm" onclick="loadStock(true)">↻ 手動更新庫存</button></div>
     <div class="search-bar">
       <input type="text" id="stockKw" placeholder="搜尋品名、顏色、廠商..." autocomplete="off"
         oninput="filterStock()" autocorrect="off" autocapitalize="off" spellcheck="false">
@@ -309,7 +309,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 <script>
 // ── API 設定 ──
 const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbz0g9G-oJ2EuxvlTHoz_gUfY_D3Gg38Yf95KNdeuenRYQraVFL2-lc4ZBf0aQxGVokBzw/exec';
-const MOBILE_VERSION_V9 = 'v20260929.1';
+const MOBILE_VERSION_V9 = 'v20261001.1';
 const API_URL = DEFAULT_API_URL;
 localStorage.removeItem('potMobileApiUrl');
 let allItems = [];
@@ -762,7 +762,9 @@ async function cancelLog(outId,btn) {
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){logBusyV2=false;if(document.getElementById('logPage').classList.contains('active'))loadLog();if(document.getElementById('stockPage').classList.contains('active'))loadStock();}});
 
 
-async function loadStock() {
+let stockTicketV10=0;
+async function loadStock(forceFresh) {
+  const ticket=++stockTicketV10;
   const list=document.getElementById('stockList'),cached=mobileCacheReadV8('items');
   if(cached&&Array.isArray(cached.value)){allItems=cached.value;filterStock();}else list.textContent='載入中…';
   let status=document.getElementById('stockStatusV2');
@@ -771,10 +773,11 @@ async function loadStock() {
     wrap.append(status);list.before(wrap);
   }
   try{
-    status.textContent=cached?'顯示上次資料，更新中…　':'載入中…　';const r=await apiGet('getItems');
+    status.textContent=cached?(forceFresh?'正在讀取即時庫存…　':'顯示上次資料，更新中…　'):'載入中…　';const r=await apiGet('getItems',forceFresh?{fresh:'1'}:undefined);
+    if(ticket!==stockTicketV10)return;
     if(!r||!r.success||!Array.isArray(r.items))throw new Error(r&&r.error||'資料格式不完整');
     allItems=r.items;mobileCacheWriteV8('items',allItems);filterStock();status.textContent='更新於 '+new Date().toLocaleTimeString('zh-TW')+'　';
-  }catch(e){if(!cached){allItems=[];list.textContent='載入失敗：'+e.message;}status.textContent='⚠ 未更新，'+(cached?'目前顯示上次資料　':'請再按更新庫存　');}
+  }catch(e){if(ticket!==stockTicketV10)return;if(!cached){allItems=[];list.textContent='載入失敗：'+e.message;}status.textContent='⚠ 未更新，'+(cached?'目前顯示上次資料　':'請再按更新庫存　');}
 }
 function stockDimensionsV3(item) {
   // 沿用電腦版的欄位對應：length=寬、width=深、height=高，單位 cm。
