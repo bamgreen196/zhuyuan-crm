@@ -216,7 +216,7 @@ body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Noto
             <div class="pricing-mode-text"><b>議價模式</b><span>輸入價格與成交價格，不使用自取優惠</span></div>
             <button type="button" id="bargain-mode-switch" class="mode-switch" aria-label="議價模式" aria-pressed="false" onclick="toggleBargainMode()"></button>
           </div>
-          <input class="customer-search" id="customer-search" type="text" placeholder="搜尋客戶名稱..." oninput="filterCustomers()" />
+          <input class="customer-search" id="customer-search" name="customer-search-no-history" type="text" inputmode="search" placeholder="搜尋客戶名稱..." oninput="filterCustomers()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
           <div class="customer-list" id="customer-list"></div>
           <div style="height:10px;"></div>
           <button class="add-customer-btn" onclick="openAddCustomer()">
@@ -426,6 +426,22 @@ let isSavingOrder = false;
 let historySearchOpened = false;
 let historyPeriod = 'all';
 let bargainingMode = false;
+const HISTORY_CACHE_KEY = 'zhuHistoryOrdersV2';
+const HISTORY_CACHE_TIME_KEY = 'zhuHistoryOrdersTimeV2';
+let historyUsingCache = false;
+let historyFetchPromise = null;
+let historyLastFetchAt = Number(localStorage.getItem(HISTORY_CACHE_TIME_KEY)) || 0;
+function getCachedHistoryOrders() {
+  try { const rows = JSON.parse(localStorage.getItem(HISTORY_CACHE_KEY) || '[]'); return Array.isArray(rows) ? rows : []; }
+  catch(e) { return []; }
+}
+function cacheHistoryOrders(rows) {
+  try {
+    localStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(Array.isArray(rows) ? rows : []));
+    historyLastFetchAt = Date.now();
+    localStorage.setItem(HISTORY_CACHE_TIME_KEY, String(historyLastFetchAt));
+  } catch(e) {}
+}
 
 // ── 離線佇列（B方案）──
 const QUEUE_KEY = 'zhuOrderQueue';
@@ -478,6 +494,7 @@ async function uploadQueue() {
   if (remaining.length === 0) {
     alert('所有訂單已成功上傳！');
     try { const r = await fetch(API_URL + '?action=getCustomers'); const data = await r.json(); if (Array.isArray(data)) { customers = data; localStorage.setItem('zhuCustomers', JSON.stringify(customers)); renderCustomers(); } } catch(e) {}
+    fetchHistoryOrders(true).catch(() => {});
   } else { alert(remaining.length + ' 筆上傳失敗，請稍後再試'); }
 }
 
@@ -514,6 +531,7 @@ async function deleteOrder(orderId) {
     const url = API_URL + '?action=deleteOrder&orderId=' + encodeURIComponent(orderId);
     const data = await fetchApiJsonWithRetry(url, 30000, 2);
     if (data.success) {
+      cacheHistoryOrders(getCachedHistoryOrders().filter(order => String(order.orderId) !== String(orderId)));
       alert('已刪除');
       switchScreen('history');
       if (document.getElementById('history-view-search').style.display !== 'none') runHistorySearch();
@@ -535,6 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchCustomers().then(c => {
       if (c) showSyncSummary(products.length, c.length);
     });
+    fetchHistoryOrders(true).catch(() => {});
   } else {
     loadDefaultProducts();
   }
@@ -687,6 +706,8 @@ function filterCustomers() {
 
 function selectCustomer(id) {
   currentCustomer = customers.find(c => c.id === id);
+  const searchInput = document.getElementById('customer-search');
+  if (searchInput) searchInput.blur();
   renderCustomers(document.getElementById('customer-search').value);
   updateBottomBar();
 }
@@ -1274,6 +1295,7 @@ async function completeAndSave() {
     } else {
       // 線上成功：同步客戶資料
       fetchCustomers().catch(() => {});
+      fetchHistoryOrders(true).catch(() => {});
     }
   }
   newOrder();
@@ -1714,23 +1736,36 @@ async function renderHistory() {
   const loadId = ++historyLoadId;
   const listEl = document.getElementById('history-today-list');
   const today = todayStr().replace(/-/g, '/');
-  document.getElementById('today-title').textContent = '今天的訂單（' + today + '）';
-  listEl.innerHTML = '<div class="empty">載入中…</div>';
+  const titleEl = document.getElementById('today-title');
+  const baseTitle = '今天的訂單（' + today + '）';
+  const cachedRows = getCachedHistoryOrders();
+  const cachedToday = cachedRows.filter(order => order && String(order.date || '').slice(0,10).replace(/-/g, '/') === today);
+  titleEl.textContent = baseTitle + (cachedRows.length ? ' · 背景更新中…' : '');
+  if (cachedToday.length) renderHistoryCards(listEl, cachedToday);
+  else listEl.innerHTML = '<div class="empty">正在連線讀取（已等待 0 秒）…</div>';
+  const startedAt = Date.now();
+  const waitTimer = setInterval(function() {
+    if (loadId !== historyLoadId || cachedRows.length) return;
+    const empty = listEl.querySelector('.empty');
+    if (empty) empty.textContent = '正在連線讀取（已等待 ' + Math.floor((Date.now() - startedAt) / 1000) + ' 秒）…';
+  }, 1000);
   try {
     if (!API_URL) throw new Error('尚未設定連線網址');
-    const orders = await fetchHistoryOrders();
+    const orders = await fetchHistoryOrders(true);
     if (loadId !== historyLoadId) return;
+    titleEl.textContent = baseTitle;
     const todayOrders = orders.filter(order => order && String(order.date || '').slice(0,10).replace(/-/g, '/') === today);
     if (!todayOrders.length) { listEl.innerHTML = '<div class="empty">今天尚無訂單</div>'; return; }
     renderHistoryCards(listEl, todayOrders);
   } catch (error) {
     if (loadId !== historyLoadId) return;
+    if (cachedRows.length) { titleEl.textContent = baseTitle + ' · 顯示上次同步資料'; return; }
     listEl.innerHTML = '';
     const message = document.createElement('div');
     message.className = 'empty';
     message.textContent = '讀取失敗：' + error.message;
     listEl.appendChild(message);
-  }
+  } finally { clearInterval(waitTimer); }
 }
 
 function openHistorySearch() {
@@ -1835,10 +1870,26 @@ function renderHistoryCards(listEl, orders) {
     });
 }
 
-async function fetchHistoryOrders() {
-  const data = await fetchApiJsonWithRetry(API_URL + '?action=getAllOrders', 45000, 2);
-  if (!Array.isArray(data)) throw new Error(data && data.error ? String(data.error) : '伺服器回傳的訂單格式不正確');
-  return data;
+async function fetchHistoryOrders(forceRefresh) {
+  const cachedRows = getCachedHistoryOrders();
+  if (!navigator.onLine) {
+    if (cachedRows.length) { historyUsingCache = true; return cachedRows; }
+    throw new Error('目前離線，尚無已同步的歷史訂單');
+  }
+  if (!forceRefresh && cachedRows.length) { historyUsingCache = true; return cachedRows; }
+  if (historyFetchPromise) return historyFetchPromise;
+  historyFetchPromise = (async function() {
+    try {
+      const data = await fetchApiJsonWithRetry(API_URL + '?action=getAllOrders', 20000, 1);
+      if (!Array.isArray(data)) throw new Error(data && data.error ? String(data.error) : '伺服器回傳的訂單格式不正確');
+      cacheHistoryOrders(data); historyUsingCache = false; return data;
+    } catch (error) {
+      if (cachedRows.length) { historyUsingCache = true; return cachedRows; }
+      throw error;
+    }
+  })();
+  try { return await historyFetchPromise; }
+  finally { historyFetchPromise = null; }
 }
 
 async function runHistorySearch() {
@@ -1892,8 +1943,9 @@ async function runHistorySearch() {
     }
     const totalAmount = orders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0);
     const totalQty = orders.reduce((sum, order) => sum + (Number(order.totalQty) || 0), 0);
-    labelEl.textContent = '共 ' + orders.length + ' 筆・' + totalQty + ' 盆・$' + totalAmount.toLocaleString();
+    labelEl.textContent = (historyUsingCache ? '上次同步資料・' : '') + '共 ' + orders.length + ' 筆・' + totalQty + ' 盆・$' + totalAmount.toLocaleString();
     renderHistoryCards(listEl, orders);
+    if (historyUsingCache) fetchHistoryOrders(true).catch(function(){});
   } catch (error) {
     const message = error && error.message ? error.message : '請確認網路後再試一次。';
     showMessage('查詢失敗：' + message);
