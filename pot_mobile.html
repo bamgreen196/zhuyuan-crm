@@ -121,6 +121,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .search-bar { display: flex; gap: 10px; margin-bottom: 16px; }
 .search-bar input { flex: 1; }
 .search-bar .btn { width: auto; padding: 14px 18px; }
+.mobile-vendor-filter-v12 { margin:-4px 0 10px; }
+.mobile-vendor-filter-v12 label { display:block; font-size:13px; font-weight:700; color:var(--gray); margin-bottom:5px; }
+.mobile-vendor-filter-v12 select { width:100%; padding:13px 14px; border:1.5px solid var(--border); border-radius:10px; background:#fff; color:var(--text); font:inherit; }
+.mobile-stock-summary-v12 { margin-bottom:14px; padding:10px 12px; border-radius:10px; background:var(--green-l); color:var(--green-d); font-size:14px; line-height:1.6; }
+.mobile-stock-summary-v12 strong { font-size:16px; }
 
 /* ── 成本計算 ── */
 .bamboo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
@@ -178,6 +183,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
         oninput="filterStock()" autocorrect="off" autocapitalize="off" spellcheck="false">
       <button class="btn btn-gray btn-sm" onclick="clearStock()">✕</button>
     </div>
+    <div class="mobile-vendor-filter-v12">
+      <label for="stockVendorMobileV12">廠商篩選</label>
+      <select id="stockVendorMobileV12" onchange="filterStock()"><option value="">全部廠商</option></select>
+    </div>
+    <div id="stockSummaryMobileV12" class="mobile-stock-summary-v12"></div>
     <div id="stockList"><div class="loading"><div class="spinner"></div><br>載入中...</div></div>
   </div>
 
@@ -309,7 +319,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 <script>
 // ── API 設定 ──
 const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbz0g9G-oJ2EuxvlTHoz_gUfY_D3Gg38Yf95KNdeuenRYQraVFL2-lc4ZBf0aQxGVokBzw/exec';
-const MOBILE_VERSION_V9 = 'v20261001.1';
+const MOBILE_VERSION_V9 = 'v20261021.1';
 const API_URL = DEFAULT_API_URL;
 localStorage.removeItem('potMobileApiUrl');
 let allItems = [];
@@ -367,18 +377,28 @@ function switchPage(id, btn) {
 
 function filterStock() {
   const kw = document.getElementById('stockKw').value.trim().toLowerCase();
-  if (!kw) { renderStock(allItems); return; }
-  renderStock(allItems.filter(i =>
-    i.name.toLowerCase().includes(kw) ||
-    (i.color && i.color.toLowerCase().includes(kw)) ||
-    (i.vendor && i.vendor.toLowerCase().includes(kw)) ||
-    (i.vendorCode && i.vendorCode.toLowerCase().includes(kw))
-  ));
+  const vendor=document.getElementById('stockVendorMobileV12')?.value||'';
+  const items=allItems.filter(i=>(!vendor||String(i.vendor||'')===vendor)&&(!kw||[
+    i.name,i.color,i.vendor,i.vendorCode,i.barcode,i.sku
+  ].some(v=>String(v||'').toLowerCase().includes(kw))));
+  renderStock(items);renderStockSummaryMobileV12(items,vendor);
 }
 
 function clearStock() {
   document.getElementById('stockKw').value = '';
-  renderStock(allItems);
+  const vendor=document.getElementById('stockVendorMobileV12');if(vendor)vendor.value='';
+  filterStock();
+}
+function populateVendorMobileV12(items){
+  const select=document.getElementById('stockVendorMobileV12');if(!select)return;
+  const current=select.value,vendors=[...new Set((items||[]).map(i=>String(i.vendor||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+  select.innerHTML='<option value="">全部廠商</option>'+vendors.map(v=>'<option value="'+escapeV2(v)+'">'+escapeV2(v)+'</option>').join('');
+  select.value=vendors.includes(current)?current:'';
+}
+function renderStockSummaryMobileV12(items,vendor){
+  const el=document.getElementById('stockSummaryMobileV12');if(!el)return;
+  const stock=items.reduce((sum,i)=>sum+(Number(i.stock)||0),0),cost=Math.round(items.reduce((sum,i)=>sum+(Number(i.cost)||0),0)*100)/100;
+  el.innerHTML=(vendor?'<strong>'+escapeV2(vendor)+'</strong>':'全部廠商')+'｜'+items.length.toLocaleString()+' 項｜庫存 '+stock.toLocaleString()+' 個｜持有成本 $'+cost.toLocaleString();
 }
 
 
@@ -766,7 +786,7 @@ let stockTicketV10=0;
 async function loadStock(forceFresh) {
   const ticket=++stockTicketV10;
   const list=document.getElementById('stockList'),cached=mobileCacheReadV8('items');
-  if(cached&&Array.isArray(cached.value)){allItems=cached.value;filterStock();}else list.textContent='載入中…';
+  if(cached&&Array.isArray(cached.value)){allItems=cached.value;populateVendorMobileV12(allItems);filterStock();}else list.textContent='載入中…';
   let status=document.getElementById('stockStatusV2');
   if(!status){
     const wrap=document.createElement('div');status=document.createElement('span');status.id='stockStatusV2';
@@ -776,7 +796,7 @@ async function loadStock(forceFresh) {
     status.textContent=cached?(forceFresh?'正在讀取即時庫存…　':'顯示上次資料，更新中…　'):'載入中…　';const r=await apiGet('getItems',forceFresh?{fresh:'1'}:undefined);
     if(ticket!==stockTicketV10)return;
     if(!r||!r.success||!Array.isArray(r.items))throw new Error(r&&r.error||'資料格式不完整');
-    allItems=r.items;mobileCacheWriteV8('items',allItems);filterStock();status.textContent='更新於 '+new Date().toLocaleTimeString('zh-TW')+'　';
+    allItems=r.items;mobileCacheWriteV8('items',allItems);populateVendorMobileV12(allItems);filterStock();status.textContent='更新於 '+new Date().toLocaleTimeString('zh-TW')+'　';
   }catch(e){if(ticket!==stockTicketV10)return;if(!cached){allItems=[];list.textContent='載入失敗：'+e.message;}status.textContent='⚠ 未更新，'+(cached?'目前顯示上次資料　':'請再按更新庫存　');}
 }
 function stockDimensionsV3(item) {
@@ -790,7 +810,7 @@ function stockDimensionsV3(item) {
   return parts.length?'<div class="si-dimensions">'+parts.join('')+'</div>':'';
 }
 function renderStock(items) {
-  document.getElementById('stockList').innerHTML=items.length?items.map(i=>'<div class="stock-item'+(i.isLow?' low':'')+'"><div class="si-details"><div class="si-name">'+escapeV2(i.name+' / '+i.color)+'</div><div class="si-sub">'+escapeV2(i.vendor+'　貨號：'+i.vendorCode)+'　$'+Number(i.price)+'</div>'+stockDimensionsV3(i)+'</div><div class="si-stock"><div class="si-num">'+Number(i.stock)+'</div><div class="si-min">警示：'+Number(i.minStock)+'</div></div></div>').join(''):'沒有找到品項';
+  document.getElementById('stockList').innerHTML=items.length?items.map(i=>'<div class="stock-item'+(i.isLow?' low':'')+'"><div class="si-details"><div class="si-name">'+escapeV2(itemTitleV3(i))+'</div><div class="si-sub">'+escapeV2(i.vendor+'　貨號：'+i.vendorCode)+'　$'+Number(i.price)+'</div>'+stockDimensionsV3(i)+'</div><div class="si-stock"><div class="si-num">'+Number(i.stock)+'</div><div class="si-min">警示：'+Number(i.minStock)+'</div></div></div>').join(''):'沒有找到品項';
 }
 
 </script>
