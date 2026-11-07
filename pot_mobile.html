@@ -319,7 +319,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 <script>
 // ── API 設定 ──
 const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbz0g9G-oJ2EuxvlTHoz_gUfY_D3Gg38Yf95KNdeuenRYQraVFL2-lc4ZBf0aQxGVokBzw/exec';
-const MOBILE_VERSION_V9 = 'v20261021.1';
+const MOBILE_VERSION_V9 = 'v20261107.1';
 const API_URL = DEFAULT_API_URL;
 localStorage.removeItem('potMobileApiUrl');
 let allItems = [];
@@ -378,11 +378,12 @@ function switchPage(id, btn) {
 function filterStock() {
   const kw = document.getElementById('stockKw').value.trim().toLowerCase();
   const vendor=document.getElementById('stockVendorMobileV12')?.value||'';
-  const items=allItems.filter(i=>(!vendor||String(i.vendor||'')===vendor)&&(!kw||[
+  const items=stockZeroLastMobileV13(allItems.filter(i=>(!vendor||String(i.vendor||'')===vendor)&&(!kw||[
     i.name,i.color,i.vendor,i.vendorCode,i.barcode,i.sku
-  ].some(v=>String(v||'').toLowerCase().includes(kw))));
+  ].some(v=>String(v||'').toLowerCase().includes(kw)))));
   renderStock(items);renderStockSummaryMobileV12(items,vendor);
 }
+function stockZeroLastMobileV13(items){return (items||[]).map((item,index)=>({item,index})).sort((a,b)=>(Number(a.item.stock)===0)-(Number(b.item.stock)===0)||a.index-b.index).map(x=>x.item);}
 
 function clearStock() {
   document.getElementById('stockKw').value = '';
@@ -745,7 +746,7 @@ function groupOutLogsV3(items) {
     if((i.type==='取消出庫'&&i.originalOutId)||(i.type==='出庫'&&(i.cancelled||linked.has(i.outId))))continue;
     const key=JSON.stringify([String(i.date||'').replace(/-/g,'/'),i.sku||i.barcode||[i.name,i.color,i.vendor,i.vendorCode]]);
     if(i.type!=='出庫'&&i.type!=='取消出庫'){other.push(i);continue;}
-    if(!groups.has(key))groups.set(key,{...i,type:'出庫',qty:0,canCancel:false,outId:'',legacy:false});
+      if(!groups.has(key))groups.set(key,{...i,type:'出庫',qty:0,canCancel:false,outId:'',outIds:[],legacy:false});
     const g=groups.get(key);
     if(i.type==='取消出庫'){
       if(!i.originalOutId)g.qty-=Number(i.qty)||0;
@@ -753,8 +754,9 @@ function groupOutLogsV3(items) {
     }
     if(i.cancelled||linked.has(i.outId))continue;
     g.qty+=Number(i.qty)||0;g.legacy=g.legacy||i.legacy;
-    if(!g.canCancel&&i.canCancel&&i.outId){g.outId=i.outId;g.canCancel=true;}
+      if(i.canCancel&&i.outId)g.outIds.push(i.outId);
   }
+    groups.forEach(g=>{g.outId=g.outIds[0]||'';g.canCancel=!!g.outId;});
   return [...other,...[...groups.values()].filter(g=>g.qty>0)].sort((a,b)=>(b.date+' '+b.time).localeCompare(a.date+' '+a.time)||(b._row||0)-(a._row||0));
 }
 function renderLog(items,dateStr) {
